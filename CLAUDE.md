@@ -39,4 +39,13 @@ Photo sharing solution to share my late father's collection (~18,000 photos) wit
 
 ## Key Commands
 
-[To be defined once the project is set up]
+```powershell
+# Deploy infrastructure (Phase 1)
+./infra/deploy.ps1 -Location swedencentral -BaseName photosharing
+
+# Download VPN client configuration (after deployment)
+./infra/get-vpn-config.ps1
+
+# Update hosts file with private endpoint IPs (after VPN connected)
+./infra/update-hosts.ps1
+```

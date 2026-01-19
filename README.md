@@ -26,6 +26,17 @@ See [docs/architecture/overview.md](docs/architecture/overview.md) for details.
 - [Database Schema](docs/design/database-schema.md)
 - [Implementation Plan](docs/implementation-plan.md)
 
+## Infrastructure
+
+Infrastructure-as-code (Bicep) is in the `infra/` folder.
+
+```powershell
+# Deploy Azure resources
+./infra/deploy.ps1
+```
+
+Requires Azure CLI and an Azure subscription. See [infra/deploy.ps1](infra/deploy.ps1) for details.
+
 ## Status
 
 In design phase. See [implementation plan](docs/implementation-plan.md) for progress.

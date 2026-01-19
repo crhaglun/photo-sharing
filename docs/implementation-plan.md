@@ -4,18 +4,39 @@ Iterative approach - each phase delivers working functionality that can be teste
 
 ## Phase 1: Infrastructure & Database
 
-**Goal:** Azure resources provisioned, database schema deployed, basic connectivity verified.
+**Goal:** Azure resources provisioned in private network, VPN access configured, database schema deployed.
 
-- [ ] Create Azure Resource Group
-- [ ] Provision Azure Database for PostgreSQL - Flexible Server
+**Infrastructure-as-code:** See `infra/` folder. Run `./infra/deploy.ps1` to deploy.
+
+- [x] Create Azure Resource Group
+- [x] Create Azure Virtual Network
+  - PostgreSQL subnet (with delegation - required by Flexible Server)
+  - Private endpoints subnet (no delegation - required for storage)
+  - GatewaySubnet for VPN (required by Azure)
+- [ ] Configure Azure VPN Gateway (Point-to-Site)
+  - Generate certificates
+  - Configure Azure VPN client
+  - Verify VPN connection from dev machine
+- [x] Provision Azure Database for PostgreSQL - Flexible Server
+  - Deploy into VNet (private access only)
+  - Enable Microsoft Entra authentication
   - Enable pgvector extension
-  - Configure firewall for local development
-- [ ] Provision Azure Blob Storage account
+  - Add developer account as Entra admin
+- [x] Provision Azure Blob Storage account
+  - Private endpoint in VNet
   - Create containers: `originals`, `thumbnails`, `default`
+  - Assign developer account "Storage Blob Data Contributor" role
 - [ ] Deploy database schema (all tables from database-schema.md)
-- [ ] Verify connectivity from local machine
+- [ ] Verify connectivity from dev machine via VPN
+  - Authenticate to PostgreSQL with Entra (no password)
+  - Authenticate to Blob Storage with Azure CLI credential
 
-**Deliverable:** Empty but functional infrastructure.
+**Deliverable:** Private network infrastructure accessible via VPN, using Entra ID / RBAC for all authentication.
+
+**Authentication approach:**
+- No connection strings or storage keys
+- Developer: Azure CLI credential (own Entra account + RBAC)
+- Photo Service: Managed Service Identity + RBAC (configured in Phase 8)
 
 ---
 
