@@ -89,4 +89,7 @@ upload upload path/to/photo.jpg
 
 # Upload directory of photos
 upload batch path/to/photos/
+
+# Run face clustering (after uploading photos)
+upload cluster --threshold 0.6 --min-samples 2
 ```

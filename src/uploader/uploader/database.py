@@ -274,3 +274,134 @@ class Database:
                 (photo_id, vector_str),
             )
         self._conn.commit()
+
+    def faces_exist(self, photo_id: str) -> bool:
+        """Check if faces have been processed for a photo."""
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM faces WHERE photo_id = %s LIMIT 1", (photo_id,))
+            return cur.fetchone() is not None
+
+    def create_face(
+        self,
+        photo_id: str,
+        bbox_x: int,
+        bbox_y: int,
+        bbox_width: int,
+        bbox_height: int,
+        embedding: list[float],
+    ) -> UUID:
+        """Create a face record.
+
+        Args:
+            photo_id: Photo ID (SHA-256 hash).
+            bbox_x: Bounding box X coordinate.
+            bbox_y: Bounding box Y coordinate.
+            bbox_width: Bounding box width.
+            bbox_height: Bounding box height.
+            embedding: List of floats (512 dimensions for InsightFace).
+
+        Returns:
+            UUID of the created face.
+        """
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        face_id = uuid4()
+        vector_str = "[" + ",".join(str(v) for v in embedding) + "]"
+
+        with self._conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO faces (id, photo_id, bbox_x, bbox_y, bbox_width, bbox_height, embedding)
+                VALUES (%s, %s, %s, %s, %s, %s, %s::vector)
+                """,
+                (face_id, photo_id, bbox_x, bbox_y, bbox_width, bbox_height, vector_str),
+            )
+        self._conn.commit()
+        return face_id
+
+    def get_face_count(self, photo_id: str) -> int:
+        """Get the number of faces for a photo."""
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM faces WHERE photo_id = %s", (photo_id,))
+            row = cur.fetchone()
+            return row[0] if row else 0
+
+    def get_all_face_embeddings(self) -> list[tuple[UUID, list[float]]]:
+        """Get all face embeddings for clustering.
+
+        Returns:
+            List of (face_id, embedding) tuples.
+        """
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT id, embedding::text FROM faces")
+            results = []
+            for row in cur.fetchall():
+                face_id = row[0]
+                # Parse pgvector format: '[1.0,2.0,3.0]' -> [1.0, 2.0, 3.0]
+                embedding_str = row[1].strip("[]")
+                embedding = [float(v) for v in embedding_str.split(",")]
+                results.append((face_id, embedding))
+            return results
+
+    def update_face_cluster(self, face_id: UUID, cluster_id: str) -> None:
+        """Update the cluster_id for a face.
+
+        Args:
+            face_id: Face UUID.
+            cluster_id: Cluster identifier string.
+        """
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "UPDATE faces SET cluster_id = %s WHERE id = %s",
+                (cluster_id, face_id),
+            )
+        self._conn.commit()
+
+    def update_face_clusters_batch(self, updates: list[tuple[UUID, str]]) -> None:
+        """Batch update cluster_ids for faces.
+
+        Args:
+            updates: List of (face_id, cluster_id) tuples.
+        """
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.executemany(
+                "UPDATE faces SET cluster_id = %s WHERE id = %s",
+                [(cluster_id, face_id) for face_id, cluster_id in updates],
+            )
+        self._conn.commit()
+
+    def get_unclustered_face_count(self) -> int:
+        """Get count of faces without cluster assignment."""
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM faces WHERE cluster_id IS NULL")
+            row = cur.fetchone()
+            return row[0] if row else 0
+
+    def get_cluster_count(self) -> int:
+        """Get count of unique clusters."""
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT COUNT(DISTINCT cluster_id) FROM faces WHERE cluster_id IS NOT NULL")
+            row = cur.fetchone()
+            return row[0] if row else 0

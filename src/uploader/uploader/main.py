@@ -113,7 +113,8 @@ def cli():
               help="Root directory for folder.yaml inheritance")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed processing information")
 @click.option("--no-embeddings", is_flag=True, help="Skip DINOv2 similarity embeddings")
-def upload(file_path: Path, root: Path | None, verbose: bool, no_embeddings: bool):
+@click.option("--no-faces", is_flag=True, help="Skip face detection")
+def upload(file_path: Path, root: Path | None, verbose: bool, no_embeddings: bool, no_faces: bool):
     """Upload a single photo with full processing.
 
     FILE_PATH: Path to the photo file to upload.
@@ -198,6 +199,28 @@ def upload(file_path: Path, root: Path | None, verbose: bool, no_embeddings: boo
             db.create_image_embedding(photo_id, embedding)
             click.echo(" done.")
 
+        # Detect faces (on by default)
+        if no_faces:
+            click.echo("  Faces: disabled (--no-faces)")
+        elif db.faces_exist(photo_id):
+            face_count = db.get_face_count(photo_id)
+            click.echo(f"  Faces: {face_count} already detected, skipping")
+        else:
+            click.echo("  Detecting faces...", nl=False)
+            from .faces import detect_faces
+            with load_image_with_orientation(file_path) as img:
+                faces = detect_faces(img)
+            for face in faces:
+                db.create_face(
+                    photo_id=photo_id,
+                    bbox_x=face.bbox_x,
+                    bbox_y=face.bbox_y,
+                    bbox_width=face.bbox_width,
+                    bbox_height=face.bbox_height,
+                    embedding=face.embedding,
+                )
+            click.echo(f" {len(faces)} found.")
+
     click.echo(f"  Photo ID: {photo_id}")
 
 
@@ -206,7 +229,8 @@ def upload(file_path: Path, root: Path | None, verbose: bool, no_embeddings: boo
 @click.option("--extensions", default=".jpg,.jpeg,.png", help="Comma-separated file extensions")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed processing information")
 @click.option("--no-embeddings", is_flag=True, help="Skip DINOv2 similarity embeddings")
-def batch(directory: Path, extensions: str, verbose: bool, no_embeddings: bool):
+@click.option("--no-faces", is_flag=True, help="Skip face detection")
+def batch(directory: Path, extensions: str, verbose: bool, no_embeddings: bool, no_faces: bool):
     """Upload all photos in a directory with full processing.
 
     DIRECTORY: Path to directory containing photos.
@@ -226,6 +250,16 @@ def batch(directory: Path, extensions: str, verbose: bool, no_embeddings: bool):
         click.echo("Loading DINOv2 model...", nl=False)
         from .embeddings import get_embedder
         embedder = get_embedder()
+        click.echo(" done.")
+
+    # Load face detector once if needed (expensive model loading)
+    face_detector = None
+    if no_faces:
+        click.echo("Faces: disabled (--no-faces)")
+    else:
+        click.echo("Loading InsightFace model...", nl=False)
+        from .faces import get_detector
+        face_detector = get_detector()
         click.echo(" done.")
 
     storage = BlobStorage(config.storage_account_name)
@@ -298,6 +332,27 @@ def batch(directory: Path, extensions: str, verbose: bool, no_embeddings: bool):
                         if verbose:
                             click.echo("  Embedding: generated")
 
+                # Detect faces if enabled
+                if face_detector:
+                    if db.faces_exist(photo_id):
+                        if verbose:
+                            face_count = db.get_face_count(photo_id)
+                            click.echo(f"  Faces: {face_count} exist, skipping")
+                    else:
+                        with load_image_with_orientation(file_path) as img:
+                            faces = face_detector.detect(img)
+                        for face in faces:
+                            db.create_face(
+                                photo_id=photo_id,
+                                bbox_x=face.bbox_x,
+                                bbox_y=face.bbox_y,
+                                bbox_width=face.bbox_width,
+                                bbox_height=face.bbox_height,
+                                embedding=face.embedding,
+                            )
+                        if verbose:
+                            click.echo(f"  Faces: {len(faces)} detected")
+
                 all_blobs_existed = has_original and has_thumbnail and has_default
                 status = "updated" if all_blobs_existed else "processed"
                 click.echo(f"  {status.capitalize()}: {photo_id[:12]}...")
@@ -308,6 +363,83 @@ def batch(directory: Path, extensions: str, verbose: bool, no_embeddings: bool):
                 errors += 1
 
     click.echo(f"\nDone! Processed: {processed}, Skipped: {skipped}, Errors: {errors}")
+
+
+@cli.command()
+@click.option("--threshold", default=0.6, help="Clustering distance threshold (lower = stricter)")
+@click.option("--min-samples", default=2, help="Minimum faces per cluster")
+def cluster(threshold: float, min_samples: int):
+    """Run clustering on all detected faces.
+
+    Groups similar faces together using DBSCAN clustering on face embeddings.
+    Results are stored in the cluster_id field of the faces table.
+    """
+    import numpy as np
+    from sklearn.cluster import DBSCAN
+
+    config = Config()
+
+    click.echo("Loading face embeddings from database...")
+
+    with Database(config.postgres_host, config.postgres_database, config.postgres_user) as db:
+        face_data = db.get_all_face_embeddings()
+
+        if not face_data:
+            click.echo("No faces found in database.")
+            return
+
+        click.echo(f"Found {len(face_data)} faces")
+
+        # Extract face IDs and embeddings
+        face_ids = [f[0] for f in face_data]
+        embeddings = np.array([f[1] for f in face_data])
+
+        # Normalize embeddings for cosine distance
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        embeddings_normalized = embeddings / norms
+
+        click.echo(f"Running DBSCAN clustering (threshold={threshold}, min_samples={min_samples})...")
+
+        # DBSCAN with cosine distance (via precomputed distance matrix)
+        # For normalized vectors, cosine distance = 1 - cosine similarity
+        # And cosine similarity = dot product for normalized vectors
+        similarity_matrix = np.dot(embeddings_normalized, embeddings_normalized.T)
+        distance_matrix = 1 - similarity_matrix
+
+        clustering = DBSCAN(
+            eps=threshold,
+            min_samples=min_samples,
+            metric="precomputed",
+        ).fit(distance_matrix)
+
+        labels = clustering.labels_
+
+        # Count clusters (excluding noise label -1)
+        n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+        n_noise = list(labels).count(-1)
+
+        click.echo(f"Found {n_clusters} clusters, {n_noise} unclustered faces")
+
+        # Update cluster_id for each face
+        click.echo("Updating database...", nl=False)
+        updates = []
+        for face_id, label in zip(face_ids, labels):
+            if label == -1:
+                cluster_id = None  # Noise/unclustered
+            else:
+                cluster_id = f"cluster_{label}"
+            updates.append((face_id, cluster_id))
+
+        # Batch update (set cluster_id to None for noise)
+        for face_id, cluster_id in updates:
+            if cluster_id:
+                db.update_face_cluster(face_id, cluster_id)
+        click.echo(" done.")
+
+        click.echo(f"\nClustering complete!")
+        click.echo(f"  Total faces: {len(face_data)}")
+        click.echo(f"  Clusters: {n_clusters}")
+        click.echo(f"  Unclustered: {n_noise}")
 
 
 if __name__ == "__main__":

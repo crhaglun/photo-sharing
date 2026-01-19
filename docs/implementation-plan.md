@@ -89,12 +89,12 @@ Iterative approach - each phase delivers working functionality that can be teste
 
 **Goal:** Detect faces and cluster them.
 
-- [ ] Add InsightFace model loading
-- [ ] Detect faces, extract bounding boxes and embeddings
-- [ ] Store face records in database
-- [ ] Run clustering algorithm on all face embeddings
-- [ ] Update cluster_id for each face
-- [ ] Test on batch, verify clusters make sense
+- [x] Add InsightFace model loading
+- [x] Detect faces, extract bounding boxes and embeddings
+- [x] Store face records in database
+- [x] Run clustering algorithm on all face embeddings
+- [x] Update cluster_id for each face
+- [x] Test on batch, verify clusters make sense (deferred tuning to UI phase)
 
 **Deliverable:** Faces detected, clustered, ready for person assignment.
 
@@ -205,6 +205,7 @@ Iterative approach - each phase delivers working functionality that can be teste
   - Create new person
   - Assign cluster to person
 - [ ] Track assignments in edit history
+- [ ] Tune face clustering parameters (threshold, min_samples) with visual feedback
 
 **Deliverable:** Complete face-to-person mapping workflow.
 
