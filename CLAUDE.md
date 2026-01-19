@@ -33,9 +33,23 @@ Photo sharing solution to share my late father's collection (~18,000 photos) wit
 - Favor simplicity over sophistication
 - Uploader is idempotent and resumable
 
+## Project Structure
+
+```
+src/
+  api/
+    PhotoSharing.Api/       # ASP.NET Core Web API
+      Entities/             # EF Core entity models
+      Data/                 # DbContext
+      Migrations/           # EF Core migrations
+```
+
 ## Development Conventions
 
-[To be defined as implementation begins]
+- Entity models in `Entities/` namespace
+- Database context in `Data/` namespace
+- Photo IDs are SHA-256 hashes (char(64))
+- pgvector for face embeddings (512d) and image embeddings (768d)
 
 ## Key Commands
 
@@ -48,4 +62,16 @@ Photo sharing solution to share my late father's collection (~18,000 photos) wit
 
 # Update hosts file with private endpoint IPs (after VPN connected)
 ./infra/update-hosts.ps1
+
+# Bootstrap database (one-time, requires VPN + psql)
+./infra/bootstrap-db.ps1
+
+# Build API
+dotnet build src/api
+
+# Create EF migration
+cd src/api/PhotoSharing.Api && dotnet ef migrations add <MigrationName>
+
+# Apply migrations to database (requires VPN connection)
+cd src/api/PhotoSharing.Api && dotnet ef database update
 ```

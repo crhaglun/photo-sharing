@@ -13,7 +13,7 @@ Iterative approach - each phase delivers working functionality that can be teste
   - PostgreSQL subnet (with delegation - required by Flexible Server)
   - Private endpoints subnet (no delegation - required for storage)
   - GatewaySubnet for VPN (required by Azure)
-- [ ] Configure Azure VPN Gateway (Point-to-Site)
+- [x] Configure Azure VPN Gateway (Point-to-Site)
   - Generate certificates
   - Configure Azure VPN client
   - Verify VPN connection from dev machine
@@ -26,8 +26,8 @@ Iterative approach - each phase delivers working functionality that can be teste
   - Private endpoint in VNet
   - Create containers: `originals`, `thumbnails`, `default`
   - Assign developer account "Storage Blob Data Contributor" role
-- [ ] Deploy database schema (all tables from database-schema.md)
-- [ ] Verify connectivity from dev machine via VPN
+- [x] Deploy database schema (all tables from database-schema.md)
+- [x] Verify connectivity from dev machine via VPN
   - Authenticate to PostgreSQL with Entra (no password)
   - Authenticate to Blob Storage with Azure CLI credential
 

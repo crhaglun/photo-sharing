@@ -76,14 +76,16 @@ Hierarchical location data. Self-referencing for parent-child relationships.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | id | uuid | PK | Unique identifier |
-| name | varchar(255) | NOT NULL | Display name (e.g., "Stockholm") |
+| name_sv | varchar(255) | NOT NULL | Swedish name (e.g., "Sverige", "Stockholm") |
+| name_en | varchar(255) | NOT NULL | English name (e.g., "Sweden", "Stockholm") |
 | parent_id | uuid | FK → places.id, NULL | Parent place (null for countries) |
 | type | varchar(20) | NOT NULL | `country`, `state`, `city`, `street` |
 
 **Indexes:**
 - `idx_places_parent` on (parent_id) - hierarchy traversal
-- `idx_places_name` on (name) - search by name
-- UNIQUE on (name, parent_id) - no duplicate siblings
+- `idx_places_name_sv` on (name_sv) - search by Swedish name
+- `idx_places_name_en` on (name_en) - search by English name
+- UNIQUE on (name_sv, parent_id) - no duplicate siblings
 
 **Notes:**
 - Filtering by a place must include all descendant places
