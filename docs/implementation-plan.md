@@ -119,7 +119,7 @@ Iterative approach - each phase delivers working functionality that can be teste
 
 **Goal:** Process entire photo collection.
 
-- [ ] Run uploader on full 18,000 image set
+- [x] Run uploader on full 18,000 image set
 - [ ] Monitor for errors, resume as needed
 - [ ] Verify counts (photos, faces, embeddings, places)
 - [ ] Spot-check data quality
@@ -132,24 +132,26 @@ Iterative approach - each phase delivers working functionality that can be teste
 
 **Goal:** Backend API for frontend consumption.
 
-- [ ] Create dotnet Web API project
+- [x] Create dotnet Web API project
 - [ ] Configure for Azure Container Apps deployment
-- [ ] Implement JWT validation (Firebase tokens)
-- [ ] Implement user allowlist check
-- [ ] Endpoints:
-  - [ ] `GET /photos` - list with filtering (date, place, person, quality)
-  - [ ] `GET /photos/{id}` - single photo details
-  - [ ] `GET /photos/{id}/thumbnail` - proxy thumbnail blob
-  - [ ] `GET /photos/{id}/default` - proxy default view blob
-  - [ ] `GET /photos/{id}/original` - proxy original blob (download)
-  - [ ] `GET /photos/{id}/similar` - similarity search
-  - [ ] `PATCH /photos/{id}` - update metadata (with edit history)
-  - [ ] `GET /faces/clusters` - unclustered faces for Faces view
-  - [ ] `PATCH /faces/{id}` - assign person to face
-  - [ ] `GET /persons` - list all persons
-  - [ ] `POST /persons` - create person
+- [x] Implement JWT validation (Firebase tokens)
+- [x] ~~Implement user allowlist check~~ → Using invite-only Firebase instead
+- [x] Endpoints:
+  - [x] `GET /photos` - list with filtering (date, place, person, quality)
+  - [x] `GET /photos/{id}` - single photo details
+  - [x] `GET /photos/{id}/thumbnail` - proxy thumbnail blob
+  - [x] `GET /photos/{id}/default` - proxy default view blob
+  - [x] `GET /photos/{id}/original` - proxy original blob (download)
+  - [x] `GET /photos/{id}/similar` - similarity search
+  - [x] `PATCH /photos/{id}` - update metadata (with edit history)
+  - [x] `GET /faces/clusters` - unclustered faces for Faces view
+  - [x] `PATCH /faces/{id}` - assign person to face
+  - [x] `GET /persons` - list all persons
+  - [x] `POST /persons` - create person
+  - [x] `GET /places` - list all places
+  - [x] `GET /photos/date-range` - min/max dates for filter UI
 - [ ] Deploy to Azure Container Apps
-- [ ] Test endpoints with curl/Postman
+- [x] Test endpoints locally
 
 **Deliverable:** Working API deployed to Azure.
 
@@ -159,16 +161,16 @@ Iterative approach - each phase delivers working functionality that can be teste
 
 **Goal:** Users can log in and browse photos.
 
-- [ ] Create frontend project (React or similar)
-- [ ] Integrate Firebase authentication
-- [ ] Handle "Request access" for non-allowlisted users
-- [ ] Implement Library view
-  - Thumbnail grid
-  - Infinite scroll
-  - Date range filter
-  - Place filter
-  - Person filter
-  - Low-quality toggle
+- [x] Create frontend project (Vite + React + TypeScript)
+- [x] Integrate Firebase authentication (Google, Microsoft, Apple sign-in)
+- [x] ~~Handle "Request access" for non-allowlisted users~~ → Using invite-only Firebase
+- [x] Implement Library view
+  - [x] Thumbnail grid with authenticated image loading
+  - [x] Infinite scroll
+  - [x] Date range filter (with min/max from database)
+  - [x] Place filter (hierarchical tree selector)
+  - [x] Person filter
+  - [x] Low-quality toggle
 - [ ] Deploy to Azure Static Web Apps (or similar)
 
 **Deliverable:** Users can log in and browse the photo library.

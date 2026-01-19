@@ -3,6 +3,7 @@
 import time
 from dataclasses import dataclass
 
+import click
 import requests
 
 
@@ -100,7 +101,7 @@ class Geocoder:
             data = response.json()
 
         except (requests.RequestException, ValueError) as e:
-            print(f"    Nominatim error: {e}")
+            click.echo(f"    Nominatim error: {e}")
             self._cache[cache_key] = None
             return None
 
@@ -112,7 +113,7 @@ class Geocoder:
         addr = data["address"]
         names = data.get("namedetails", {})
 
-        def localized(default: str | None, name_key: str | None = None) -> LocalizedName | None:
+        def localized(default: str | None) -> LocalizedName | None:
             """Create localized name from address and namedetails."""
             if not default:
                 return None
@@ -145,7 +146,7 @@ class Geocoder:
 
         city_name = result.city.en if result.city else None
         country_name = result.country.en if result.country else None
-        print(f"    Nominatim: {city_name or state}, {country_name}")
+        click.echo(f"    Nominatim: {city_name or state}, {country_name}")
         self._cache[cache_key] = result
         return result
 

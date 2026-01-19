@@ -111,7 +111,7 @@ def get_place_id_for_photo(
     Returns:
         Tuple of (place_id, source) where source is 'folder.yaml', 'GPS', or 'none'.
     """
-    from .geocoding import reverse_geocode
+
 
     # Priority 1: folder.yaml place (explicit configuration)
     if place_hint and place_hint.has_hierarchy:
@@ -436,7 +436,8 @@ def cluster(threshold: float, min_samples: int):
         # For normalized vectors, cosine distance = 1 - cosine similarity
         # And cosine similarity = dot product for normalized vectors
         similarity_matrix = np.dot(embeddings_normalized, embeddings_normalized.T)
-        distance_matrix = 1 - similarity_matrix
+        # Clip to handle floating-point precision issues (similarity slightly > 1)
+        distance_matrix = np.clip(1 - similarity_matrix, 0, 2)
 
         clustering = DBSCAN(
             eps=threshold,
