@@ -104,12 +104,12 @@ Iterative approach - each phase delivers working functionality that can be teste
 
 **Goal:** Extract GPS and reverse geocode to place hierarchy.
 
-- [ ] Add GPS extraction from EXIF
-- [ ] Identify reliable GPS sources (by folder/device)
-- [ ] Batch reverse geocode via Nominatim
-- [ ] Create/lookup places in hierarchy
-- [ ] Link photos to places
-- [ ] Test on photos with GPS data
+- [x] Add GPS extraction from EXIF (done in Phase 3, updated for HEIC)
+- [x] Identify reliable GPS sources (by folder/device) - trusting all GPS for now
+- [x] Batch reverse geocode via Nominatim
+- [x] Create/lookup places in hierarchy
+- [x] Link photos to places
+- [x] Test on photos with GPS data
 
 **Deliverable:** Photos with GPS have place tags populated.
 
@@ -219,6 +219,7 @@ Iterative approach - each phase delivers working functionality that can be teste
 - [ ] Add error handling and logging
 - [ ] Test on mobile devices
 - [ ] Performance check on similarity search
+- [ ] Translate geocoded place names (English → Swedish for name_sv column)
 - [ ] Document operational procedures (adding users, manual cleanup)
 - [ ] Final end-to-end test with family members
 

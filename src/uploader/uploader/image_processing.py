@@ -7,7 +7,14 @@ from datetime import datetime
 from pathlib import Path
 
 from PIL import Image
-from PIL.ExifTags import TAGS, GPSTAGS
+from PIL.ExifTags import TAGS, GPSTAGS, IFD, Base
+
+# Register HEIC/HEIF support
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except ImportError:
+    pass  # HEIC support optional
 
 
 @dataclass
@@ -100,6 +107,9 @@ def _format_rational(value) -> str | None:
 def extract_exif(file_path: Path) -> ExifData:
     """Extract EXIF metadata from an image file.
 
+    Tries modern getexif() API first (works with HEIC), then falls back
+    to legacy _getexif() for older JPEG files if needed.
+
     Args:
         file_path: Path to the image file.
 
@@ -111,15 +121,42 @@ def extract_exif(file_path: Path) -> ExifData:
 
     try:
         with Image.open(file_path) as img:
-            exif = img._getexif()
-            if not exif:
-                return result
-
-            # Build decoded EXIF dict
             decoded = {}
-            for tag_id, value in exif.items():
-                tag = TAGS.get(tag_id, tag_id)
-                decoded[tag] = value
+            gps_ifd = {}
+
+            # Try modern getexif() API first (works with HEIC, modern JPEG)
+            exif = img.getexif() if hasattr(img, 'getexif') else None
+            if exif:
+                # Get sub-IFDs for additional data
+                exif_ifd = exif.get_ifd(IFD.Exif) if hasattr(IFD, 'Exif') else {}
+                gps_ifd = exif.get_ifd(IFD.GPSInfo) if hasattr(IFD, 'GPSInfo') else {}
+
+                # Build decoded EXIF dict from base EXIF
+                for tag_id, value in exif.items():
+                    tag = TAGS.get(tag_id, tag_id)
+                    decoded[tag] = value
+
+                # Add EXIF IFD data
+                for tag_id, value in exif_ifd.items():
+                    tag = TAGS.get(tag_id, tag_id)
+                    decoded[tag] = value
+
+            # Fallback to legacy _getexif() if modern API didn't find data
+            if not decoded and hasattr(img, '_getexif'):
+                legacy_exif = img._getexif()
+                if legacy_exif:
+                    for tag_id, value in legacy_exif.items():
+                        tag = TAGS.get(tag_id, tag_id)
+                        decoded[tag] = value
+
+                    # Extract GPS from legacy format
+                    if "GPSInfo" in decoded and isinstance(decoded["GPSInfo"], dict):
+                        for tag_id, value in decoded["GPSInfo"].items():
+                            tag = GPSTAGS.get(tag_id, tag_id)
+                            gps_ifd[tag] = value
+
+            if not decoded:
+                return result
 
             # Extract common fields
             result.camera_make = decoded.get("Make")
@@ -144,9 +181,9 @@ def extract_exif(file_path: Path) -> ExifData:
                     result.shutter_speed = f"1/{int(1/float(et))}"
 
             # ISO
-            if "ISOSpeedRatings" in decoded:
-                iso = decoded["ISOSpeedRatings"]
-                result.iso = int(iso) if iso else None
+            iso_val = decoded.get("ISOSpeedRatings") or decoded.get("PhotographicSensitivity")
+            if iso_val:
+                result.iso = int(iso_val) if iso_val else None
 
             # Date taken
             date_str = decoded.get("DateTimeOriginal") or decoded.get("DateTime")
@@ -156,18 +193,12 @@ def extract_exif(file_path: Path) -> ExifData:
                 except ValueError:
                     pass
 
-            # GPS coordinates
-            gps_info = decoded.get("GPSInfo")
-            if gps_info:
-                gps_decoded = {}
-                for tag_id, value in gps_info.items():
-                    tag = GPSTAGS.get(tag_id, tag_id)
-                    gps_decoded[tag] = value
-
-                lat = gps_decoded.get("GPSLatitude")
-                lat_ref = gps_decoded.get("GPSLatitudeRef")
-                lon = gps_decoded.get("GPSLongitude")
-                lon_ref = gps_decoded.get("GPSLongitudeRef")
+            # GPS coordinates - try numeric keys first (modern API), then string keys (legacy)
+            if gps_ifd:
+                lat_ref = gps_ifd.get(1) or gps_ifd.get("GPSLatitudeRef")
+                lat = gps_ifd.get(2) or gps_ifd.get("GPSLatitude")
+                lon_ref = gps_ifd.get(3) or gps_ifd.get("GPSLongitudeRef")
+                lon = gps_ifd.get(4) or gps_ifd.get("GPSLongitude")
 
                 if lat and lon:
                     result.gps_lat = _convert_to_degrees(lat)
@@ -207,9 +238,9 @@ def apply_exif_orientation(img: Image.Image) -> Image.Image:
         Correctly oriented image.
     """
     try:
-        exif_data = img._getexif()
-        if exif_data:
-            orientation = exif_data.get(274)  # Orientation tag
+        exif = img.getexif()
+        if exif:
+            orientation = exif.get(274)  # Orientation tag (Base.Orientation)
             if orientation == 3:
                 return img.rotate(180, expand=True)
             elif orientation == 6:

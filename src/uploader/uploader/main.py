@@ -1,8 +1,10 @@
 """Main CLI entry point for the uploader."""
 
 import os
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
@@ -12,6 +14,24 @@ from .folder_metadata import get_folder_metadata, PlaceHint
 from .hash import compute_sha256
 from .image_processing import process_image, load_image_with_orientation, ExifData
 from .storage import BlobStorage
+
+if TYPE_CHECKING:
+    from .embeddings import DINOv2Embedder
+    from .faces import FaceDetector
+    from .geocoding import Geocoder
+
+
+@dataclass
+class ProcessingContext:
+    """Shared context for photo processing."""
+
+    config: Config
+    storage: BlobStorage
+    db: Database
+    embedder: "DINOv2Embedder | None" = None
+    face_detector: "FaceDetector | None" = None
+    geocoder: "Geocoder | None" = None
+    verbose: bool = False
 
 
 def get_date_for_photo(
@@ -74,31 +94,172 @@ def get_place_id_for_photo(
     db: Database,
     exif: ExifData,
     place_hint: PlaceHint | None,
-) -> str | None:
+    geocoder: "Geocoder | None" = None,
+) -> tuple[str | None, str]:
     """Determine place ID for a photo.
 
     Priority:
-    1. EXIF GPS coordinates (reverse geocoding - TODO: implement in Phase 6)
-    2. folder.yaml place hierarchy
+    1. folder.yaml place hierarchy (explicit configuration)
+    2. EXIF GPS coordinates (reverse geocoding)
+
+    Args:
+        db: Database connection.
+        exif: Extracted EXIF data.
+        place_hint: Place hint from folder.yaml.
+        geocoder: Optional geocoder instance for batch processing.
 
     Returns:
-        Place UUID or None.
+        Tuple of (place_id, source) where source is 'folder.yaml', 'GPS', or 'none'.
     """
-    # TODO: Phase 6 will add GPS reverse geocoding
-    # For now, skip EXIF GPS and use folder.yaml place hierarchy
+    from .geocoding import reverse_geocode
 
+    # Priority 1: folder.yaml place (explicit configuration)
     if place_hint and place_hint.has_hierarchy:
-        # Use folder.yaml place - for now, use same name for both languages
-        # TODO: Could add translation lookup later
         place_id = db.create_place_hierarchy(
             country=(place_hint.country, place_hint.country) if place_hint.country else None,
             state=(place_hint.state, place_hint.state) if place_hint.state else None,
             city=(place_hint.city, place_hint.city) if place_hint.city else None,
             street=(place_hint.street, place_hint.street) if place_hint.street else None,
         )
-        return place_id
+        return place_id, "folder.yaml"
 
-    return None
+    # Priority 2: GPS reverse geocoding
+    if geocoder and exif.gps_lat is not None and exif.gps_lon is not None:
+        geocoded = geocoder.reverse_geocode(exif.gps_lat, exif.gps_lon)
+
+        if geocoded and geocoded.country:
+            place_id = db.create_place_hierarchy(
+                country=(geocoded.country.sv, geocoded.country.en) if geocoded.country else None,
+                state=(geocoded.state.sv, geocoded.state.en) if geocoded.state else None,
+                city=(geocoded.city.sv, geocoded.city.en) if geocoded.city else None,
+                street=(geocoded.street.sv, geocoded.street.en) if geocoded.street else None,
+            )
+            return place_id, "GPS"
+
+    return None, "none"
+
+
+def process_photo(
+    ctx: ProcessingContext,
+    file_path: Path,
+    folder_yaml_root: Path | None = None,
+) -> str:
+    """Process a single photo with full pipeline.
+
+    Args:
+        ctx: Processing context with models and connections.
+        file_path: Path to the photo file.
+        folder_yaml_root: Optional root directory for folder.yaml inheritance.
+
+    Returns:
+        Photo ID (SHA-256 hash).
+    """
+    verbose = ctx.verbose
+
+    # Get folder metadata
+    folder_meta = get_folder_metadata(file_path, folder_yaml_root, verbose=verbose)
+
+    # Compute hash
+    photo_id = compute_sha256(file_path)
+    if verbose:
+        click.echo(f"  Hash: {photo_id[:12]}...")
+
+    # Check which blobs already exist
+    has_original = ctx.storage.exists("originals", photo_id)
+    has_thumbnail = ctx.storage.exists("thumbnails", photo_id)
+    has_default = ctx.storage.exists("default", photo_id)
+
+    # Process image (resize + EXIF)
+    thumbnail, default_view, exif = process_image(file_path)
+
+    # Determine dates
+    date_earlier, date_later, date_source = get_date_for_photo(exif, folder_meta.date_range, file_path)
+    if verbose:
+        if date_earlier == date_later:
+            click.echo(f"  Date: {date_earlier.date()} (from {date_source})")
+        else:
+            click.echo(f"  Date: {date_earlier.date()} to {date_later.date()} (from {date_source})")
+
+    # Upload blobs (skip individually if already exist)
+    if not has_original:
+        ctx.storage.upload_original(file_path, photo_id)
+    if not has_thumbnail:
+        ctx.storage.upload_thumbnail(photo_id, thumbnail)
+    if not has_default:
+        ctx.storage.upload_default(photo_id, default_view)
+
+    if verbose and (has_original or has_thumbnail or has_default):
+        click.echo(f"  Blobs: original={'skip' if has_original else 'upload'}, "
+                  f"thumbnail={'skip' if has_thumbnail else 'upload'}, "
+                  f"default={'skip' if has_default else 'upload'}")
+
+    # Get or create place
+    if verbose:
+        if folder_meta.place and folder_meta.place.has_hierarchy:
+            click.echo(f"  Place hint: folder.yaml ({folder_meta.place.city or folder_meta.place.country})")
+        elif exif.gps_lat is not None and exif.gps_lon is not None:
+            click.echo(f"  GPS coordinates: {exif.gps_lat:.6f}, {exif.gps_lon:.6f}")
+            if ctx.geocoder:
+                click.echo("  Geocoding: calling Nominatim...")
+            else:
+                click.echo("  Geocoding: disabled (no geocoder)")
+        else:
+            click.echo("  Place: no folder.yaml hint or GPS coordinates")
+
+    place_id, place_source = get_place_id_for_photo(ctx.db, exif, folder_meta.place, ctx.geocoder)
+    if verbose and place_id:
+        if place_source == "folder.yaml":
+            click.echo(f"  Place: {folder_meta.place.city or folder_meta.place.country} (from folder.yaml)")
+        elif place_source == "GPS":
+            click.echo(f"  Place: geocoded from GPS")
+
+    # Create/update photo record (respects manual edits via has_manual_edits check)
+    ctx.db.create_photo(
+        photo_id=photo_id,
+        original_filename=file_path.name,
+        date_not_earlier_than=date_earlier,
+        date_not_later_than=date_later,
+        place_id=place_id,
+    )
+
+    # Create EXIF record
+    if exif.camera_make or exif.taken_at:
+        ctx.db.create_exif_metadata(photo_id, exif)
+
+    # Generate embedding if enabled
+    if ctx.embedder:
+        if ctx.db.embedding_exists(photo_id):
+            if verbose:
+                click.echo("  Embedding: exists, skipping")
+        else:
+            with load_image_with_orientation(file_path) as img:
+                embedding = ctx.embedder.generate(img)
+            ctx.db.create_image_embedding(photo_id, embedding)
+            if verbose:
+                click.echo("  Embedding: generated")
+
+    # Detect faces if enabled
+    if ctx.face_detector:
+        if ctx.db.faces_exist(photo_id):
+            if verbose:
+                face_count = ctx.db.get_face_count(photo_id)
+                click.echo(f"  Faces: {face_count} exist, skipping")
+        else:
+            with load_image_with_orientation(file_path) as img:
+                faces = ctx.face_detector.detect(img)
+            for face in faces:
+                ctx.db.create_face(
+                    photo_id=photo_id,
+                    bbox_x=face.bbox_x,
+                    bbox_y=face.bbox_y,
+                    bbox_width=face.bbox_width,
+                    bbox_height=face.bbox_height,
+                    embedding=face.embedding,
+                )
+            if verbose:
+                click.echo(f"  Faces: {len(faces)} detected")
+
+    return photo_id
 
 
 @click.group()
@@ -114,7 +275,8 @@ def cli():
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed processing information")
 @click.option("--no-embeddings", is_flag=True, help="Skip DINOv2 similarity embeddings")
 @click.option("--no-faces", is_flag=True, help="Skip face detection")
-def upload(file_path: Path, root: Path | None, verbose: bool, no_embeddings: bool, no_faces: bool):
+@click.option("--no-geocoding", is_flag=True, help="Skip GPS reverse geocoding")
+def upload(file_path: Path, root: Path | None, verbose: bool, no_embeddings: bool, no_faces: bool, no_geocoding: bool):
     """Upload a single photo with full processing.
 
     FILE_PATH: Path to the photo file to upload.
@@ -123,114 +285,52 @@ def upload(file_path: Path, root: Path | None, verbose: bool, no_embeddings: boo
 
     click.echo(f"Processing: {file_path.name}")
 
-    # Get folder metadata
-    folder_meta = get_folder_metadata(file_path, root, verbose=verbose)
+    # Load models
+    embedder = None
+    if not no_embeddings:
+        click.echo("  Loading DINOv2 model...", nl=False)
+        from .embeddings import get_embedder
+        embedder = get_embedder()
+        click.echo(" done.")
 
-    # Compute hash
-    click.echo("  Computing SHA-256...", nl=False)
-    photo_id = compute_sha256(file_path)
-    click.echo(f" {photo_id[:12]}...")
+    face_detector = None
+    if not no_faces:
+        click.echo("  Loading InsightFace model...", nl=False)
+        from .faces import get_detector
+        face_detector = get_detector()
+        click.echo(" done.")
 
-    # Process image (resize + EXIF)
-    click.echo("  Processing image...", nl=False)
-    thumbnail, default_view, exif = process_image(file_path)
-    click.echo(" done.")
+    geocoder = None
+    if not no_geocoding:
+        from .geocoding import get_geocoder
+        geocoder = get_geocoder()
 
-    # Determine dates
-    date_earlier, date_later, date_source = get_date_for_photo(exif, folder_meta.date_range, file_path)
-
-    if date_earlier == date_later:
-        click.echo(f"  Date: {date_earlier.date()} (from {date_source})")
-    else:
-        click.echo(f"  Date: {date_earlier.date()} to {date_later.date()} (from {date_source})")
-
-    # Upload blobs (skip individually if already exist)
     storage = BlobStorage(config.storage_account_name)
 
-    has_original = storage.exists("originals", photo_id)
-    has_thumbnail = storage.exists("thumbnails", photo_id)
-    has_default = storage.exists("default", photo_id)
-
-    if has_original and has_thumbnail and has_default:
-        click.echo("  Blobs: all exist, skipping upload")
-    else:
-        click.echo(f"  Uploading blobs...", nl=False)
-        if not has_original:
-            storage.upload_original(file_path, photo_id)
-        if not has_thumbnail:
-            storage.upload_thumbnail(photo_id, thumbnail)
-        if not has_default:
-            storage.upload_default(photo_id, default_view)
-        click.echo(" done.")
-
-    # Database operations
     with Database(config.postgres_host, config.postgres_database, config.postgres_user) as db:
-        # Get or create place
-        place_id = get_place_id_for_photo(db, exif, folder_meta.place)
-        if place_id:
-            click.echo(f"  Place: {folder_meta.place.city or folder_meta.place.country}")
-
-        # Create photo record
-        click.echo("  Creating database records...", nl=False)
-        db.create_photo(
-            photo_id=photo_id,
-            original_filename=file_path.name,
-            date_not_earlier_than=date_earlier,
-            date_not_later_than=date_later,
-            place_id=place_id,
+        ctx = ProcessingContext(
+            config=config,
+            storage=storage,
+            db=db,
+            embedder=embedder,
+            face_detector=face_detector,
+            geocoder=geocoder,
+            verbose=True,  # Always verbose for single upload
         )
 
-        # Create EXIF record
-        if exif.camera_make or exif.taken_at:
-            db.create_exif_metadata(photo_id, exif)
-
-        click.echo(" done.")
-
-        # Generate embeddings (on by default)
-        if no_embeddings:
-            click.echo("  Embedding: disabled (--no-embeddings)")
-        elif db.embedding_exists(photo_id):
-            click.echo("  Embedding: already exists, skipping")
-        else:
-            click.echo("  Generating embedding...", nl=False)
-            from .embeddings import generate_embedding
-            with load_image_with_orientation(file_path) as img:
-                embedding = generate_embedding(img)
-            db.create_image_embedding(photo_id, embedding)
-            click.echo(" done.")
-
-        # Detect faces (on by default)
-        if no_faces:
-            click.echo("  Faces: disabled (--no-faces)")
-        elif db.faces_exist(photo_id):
-            face_count = db.get_face_count(photo_id)
-            click.echo(f"  Faces: {face_count} already detected, skipping")
-        else:
-            click.echo("  Detecting faces...", nl=False)
-            from .faces import detect_faces
-            with load_image_with_orientation(file_path) as img:
-                faces = detect_faces(img)
-            for face in faces:
-                db.create_face(
-                    photo_id=photo_id,
-                    bbox_x=face.bbox_x,
-                    bbox_y=face.bbox_y,
-                    bbox_width=face.bbox_width,
-                    bbox_height=face.bbox_height,
-                    embedding=face.embedding,
-                )
-            click.echo(f" {len(faces)} found.")
+        photo_id = process_photo(ctx, file_path, root)
 
     click.echo(f"  Photo ID: {photo_id}")
 
 
 @cli.command()
 @click.argument("directory", type=click.Path(exists=True, file_okay=False, path_type=Path))
-@click.option("--extensions", default=".jpg,.jpeg,.png", help="Comma-separated file extensions")
+@click.option("--extensions", default=".jpg,.jpeg,.png,.heic,.heif", help="Comma-separated file extensions")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed processing information")
 @click.option("--no-embeddings", is_flag=True, help="Skip DINOv2 similarity embeddings")
 @click.option("--no-faces", is_flag=True, help="Skip face detection")
-def batch(directory: Path, extensions: str, verbose: bool, no_embeddings: bool, no_faces: bool):
+@click.option("--no-geocoding", is_flag=True, help="Skip GPS reverse geocoding")
+def batch(directory: Path, extensions: str, verbose: bool, no_embeddings: bool, no_faces: bool, no_geocoding: bool):
     """Upload all photos in a directory with full processing.
 
     DIRECTORY: Path to directory containing photos.
@@ -242,7 +342,7 @@ def batch(directory: Path, extensions: str, verbose: bool, no_embeddings: bool, 
     files = sorted([f for f in directory.rglob("*") if f.suffix.lower() in ext_list])
     click.echo(f"Found {len(files)} files to process")
 
-    # Load embedder once if needed (expensive model loading)
+    # Load models once (expensive)
     embedder = None
     if no_embeddings:
         click.echo("Embeddings: disabled (--no-embeddings)")
@@ -252,7 +352,6 @@ def batch(directory: Path, extensions: str, verbose: bool, no_embeddings: bool, 
         embedder = get_embedder()
         click.echo(" done.")
 
-    # Load face detector once if needed (expensive model loading)
     face_detector = None
     if no_faces:
         click.echo("Faces: disabled (--no-faces)")
@@ -262,107 +361,40 @@ def batch(directory: Path, extensions: str, verbose: bool, no_embeddings: bool, 
         face_detector = get_detector()
         click.echo(" done.")
 
+    geocoder = None
+    if no_geocoding:
+        click.echo("Geocoding: disabled (--no-geocoding)")
+    else:
+        from .geocoding import get_geocoder
+        geocoder = get_geocoder()
+
     storage = BlobStorage(config.storage_account_name)
     processed = 0
-    skipped = 0
     errors = 0
 
     with Database(config.postgres_host, config.postgres_database, config.postgres_user) as db:
+        ctx = ProcessingContext(
+            config=config,
+            storage=storage,
+            db=db,
+            embedder=embedder,
+            face_detector=face_detector,
+            geocoder=geocoder,
+            verbose=verbose,
+        )
+
         for i, file_path in enumerate(files, 1):
             click.echo(f"[{i}/{len(files)}] {file_path.relative_to(directory)}")
 
             try:
-                # Get folder metadata (no root limit - allow inheritance from parent folders)
-                folder_meta = get_folder_metadata(file_path, root=None, verbose=verbose)
-
-                # Compute hash
-                photo_id = compute_sha256(file_path)
-
-                # Check which blobs already exist
-                has_original = storage.exists("originals", photo_id)
-                has_thumbnail = storage.exists("thumbnails", photo_id)
-                has_default = storage.exists("default", photo_id)
-
-                # Process image (needed for EXIF and any missing blobs)
-                thumbnail, default_view, exif = process_image(file_path)
-
-                # Determine dates
-                date_earlier, date_later, date_source = get_date_for_photo(exif, folder_meta.date_range, file_path)
-
-                if verbose:
-                    click.echo(f"  Date: {date_earlier.date()} to {date_later.date()} (from {date_source})")
-
-                # Upload blobs (skip individually if already exist)
-                if not has_original:
-                    storage.upload_original(file_path, photo_id)
-                if not has_thumbnail:
-                    storage.upload_thumbnail(photo_id, thumbnail)
-                if not has_default:
-                    storage.upload_default(photo_id, default_view)
-
-                if verbose and (has_original or has_thumbnail or has_default):
-                    click.echo(f"  Blobs: original={'skip' if has_original else 'upload'}, "
-                              f"thumbnail={'skip' if has_thumbnail else 'upload'}, "
-                              f"default={'skip' if has_default else 'upload'}")
-
-                # Get or create place
-                place_id = get_place_id_for_photo(db, exif, folder_meta.place)
-
-                # Create/update records (respects manual edits via has_manual_edits check)
-                db.create_photo(
-                    photo_id=photo_id,
-                    original_filename=file_path.name,
-                    date_not_earlier_than=date_earlier,
-                    date_not_later_than=date_later,
-                    place_id=place_id,
-                )
-
-                if exif.camera_make or exif.taken_at:
-                    db.create_exif_metadata(photo_id, exif)
-
-                # Generate embedding if enabled
-                if embedder:
-                    if db.embedding_exists(photo_id):
-                        if verbose:
-                            click.echo("  Embedding: exists, skipping")
-                    else:
-                        with load_image_with_orientation(file_path) as img:
-                            embedding = embedder.generate(img)
-                        db.create_image_embedding(photo_id, embedding)
-                        if verbose:
-                            click.echo("  Embedding: generated")
-
-                # Detect faces if enabled
-                if face_detector:
-                    if db.faces_exist(photo_id):
-                        if verbose:
-                            face_count = db.get_face_count(photo_id)
-                            click.echo(f"  Faces: {face_count} exist, skipping")
-                    else:
-                        with load_image_with_orientation(file_path) as img:
-                            faces = face_detector.detect(img)
-                        for face in faces:
-                            db.create_face(
-                                photo_id=photo_id,
-                                bbox_x=face.bbox_x,
-                                bbox_y=face.bbox_y,
-                                bbox_width=face.bbox_width,
-                                bbox_height=face.bbox_height,
-                                embedding=face.embedding,
-                            )
-                        if verbose:
-                            click.echo(f"  Faces: {len(faces)} detected")
-
-                all_blobs_existed = has_original and has_thumbnail and has_default
-                status = "updated" if all_blobs_existed else "processed"
-                click.echo(f"  {status.capitalize()}: {photo_id[:12]}...")
+                photo_id = process_photo(ctx, file_path, folder_yaml_root=None)
+                click.echo(f"  Processed: {photo_id[:12]}...")
                 processed += 1
-
             except Exception as e:
                 click.echo(f"  Error: {e}", err=True)
                 errors += 1
 
-    click.echo(f"\nDone! Processed: {processed}, Skipped: {skipped}, Errors: {errors}")
+    click.echo(f"\nDone! Processed: {processed}, Errors: {errors}")
 
 
 @cli.command()
@@ -422,18 +454,9 @@ def cluster(threshold: float, min_samples: int):
 
         # Update cluster_id for each face
         click.echo("Updating database...", nl=False)
-        updates = []
         for face_id, label in zip(face_ids, labels):
-            if label == -1:
-                cluster_id = None  # Noise/unclustered
-            else:
-                cluster_id = f"cluster_{label}"
-            updates.append((face_id, cluster_id))
-
-        # Batch update (set cluster_id to None for noise)
-        for face_id, cluster_id in updates:
-            if cluster_id:
-                db.update_face_cluster(face_id, cluster_id)
+            if label != -1:
+                db.update_face_cluster(face_id, f"cluster_{label}")
         click.echo(" done.")
 
         click.echo(f"\nClustering complete!")
