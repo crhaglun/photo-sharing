@@ -1,0 +1,22 @@
+[project]
+name = "photo-uploader"
+version = "0.1.0"
+description = "Photo uploader for photo-sharing service"
+requires-python = ">=3.11"
+dependencies = [
+    "azure-identity>=1.17.0",
+    "azure-storage-blob>=12.20.0",
+    "psycopg[binary]>=3.2.0",
+    "click>=8.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.4.0",
+]
+
+[project.scripts]
+upload = "uploader.main:cli"
+
+[tool.ruff]
+line-length = 100

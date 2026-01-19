@@ -42,6 +42,12 @@ src/
       Entities/             # EF Core entity models
       Data/                 # DbContext
       Migrations/           # EF Core migrations
+  uploader/
+    uploader/               # Python CLI for batch photo upload
+      main.py               # CLI entry point
+      hash.py               # SHA-256 hashing
+      storage.py            # Azure Blob Storage
+      database.py           # PostgreSQL operations
 ```
 
 ## Development Conventions
@@ -74,4 +80,13 @@ cd src/api/PhotoSharing.Api && dotnet ef migrations add <MigrationName>
 
 # Apply migrations to database (requires VPN connection)
 cd src/api/PhotoSharing.Api && dotnet ef database update
+
+# Install uploader dependencies
+cd src/uploader && pip install -e .
+
+# Upload single photo (requires VPN)
+upload upload path/to/photo.jpg
+
+# Upload directory of photos
+upload batch path/to/photos/
 ```

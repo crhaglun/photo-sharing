@@ -44,11 +44,11 @@ Iterative approach - each phase delivers working functionality that can be teste
 
 **Goal:** Upload a single photo end-to-end, verify data flows correctly.
 
-- [ ] Create uploader project (Python recommended for ML library compatibility)
-- [ ] Implement SHA-256 hashing
-- [ ] Implement blob upload (original only, no processing yet)
-- [ ] Implement photo record creation in database
-- [ ] Test with a single image
+- [x] Create uploader project (Python recommended for ML library compatibility)
+- [x] Implement SHA-256 hashing
+- [x] Implement blob upload (original only, no processing yet)
+- [x] Implement photo record creation in database
+- [x] Test with a single image
 
 **Deliverable:** One photo in blob storage with corresponding database record.
 

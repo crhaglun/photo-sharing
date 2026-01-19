@@ -66,3 +66,19 @@ Desktop.ini
 
 # VPN client config (downloaded, contains no secrets but not needed in repo)
 vpn-client-config/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+ENV/
+.python-version
+*.pyo
+*.pyd
