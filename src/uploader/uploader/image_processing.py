@@ -197,6 +197,43 @@ def extract_exif(file_path: Path) -> ExifData:
     return result
 
 
+def apply_exif_orientation(img: Image.Image) -> Image.Image:
+    """Apply EXIF orientation to an image.
+
+    Args:
+        img: PIL Image (must have EXIF data accessible).
+
+    Returns:
+        Correctly oriented image.
+    """
+    try:
+        exif_data = img._getexif()
+        if exif_data:
+            orientation = exif_data.get(274)  # Orientation tag
+            if orientation == 3:
+                return img.rotate(180, expand=True)
+            elif orientation == 6:
+                return img.rotate(270, expand=True)
+            elif orientation == 8:
+                return img.rotate(90, expand=True)
+    except Exception:
+        pass
+    return img
+
+
+def load_image_with_orientation(file_path: Path) -> Image.Image:
+    """Load an image and apply EXIF orientation.
+
+    Args:
+        file_path: Path to the image file.
+
+    Returns:
+        Correctly oriented PIL Image.
+    """
+    img = Image.open(file_path)
+    return apply_exif_orientation(img)
+
+
 def process_image(file_path: Path) -> tuple[bytes, bytes, ExifData]:
     """Process an image: create variants and extract EXIF.
 
@@ -209,20 +246,7 @@ def process_image(file_path: Path) -> tuple[bytes, bytes, ExifData]:
     exif = extract_exif(file_path)
 
     with Image.open(file_path) as img:
-        # Handle EXIF orientation
-        try:
-            exif_data = img._getexif()
-            if exif_data:
-                orientation = exif_data.get(274)  # Orientation tag
-                if orientation == 3:
-                    img = img.rotate(180, expand=True)
-                elif orientation == 6:
-                    img = img.rotate(270, expand=True)
-                elif orientation == 8:
-                    img = img.rotate(90, expand=True)
-        except Exception:
-            pass
-
+        img = apply_exif_orientation(img)
         thumbnail = create_thumbnail(img)
         default = create_default_view(img)
 

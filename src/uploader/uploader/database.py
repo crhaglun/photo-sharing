@@ -240,3 +240,37 @@ class Database:
             result_id = self.get_or_create_place(street[0], street[1], "street", parent_id)
 
         return result_id
+
+    def embedding_exists(self, photo_id: str) -> bool:
+        """Check if an image embedding exists for a photo."""
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM image_embeddings WHERE photo_id = %s", (photo_id,))
+            return cur.fetchone() is not None
+
+    def create_image_embedding(self, photo_id: str, embedding: list[float]) -> None:
+        """Create or update image embedding record.
+
+        Args:
+            photo_id: Photo ID (SHA-256 hash).
+            embedding: List of floats (768 dimensions for DINOv2-base).
+        """
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        # Convert list to pgvector format string: [1.0, 2.0, 3.0] -> '[1.0,2.0,3.0]'
+        vector_str = "[" + ",".join(str(v) for v in embedding) + "]"
+
+        with self._conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO image_embeddings (photo_id, embedding)
+                VALUES (%s, %s::vector)
+                ON CONFLICT (photo_id) DO UPDATE SET
+                    embedding = EXCLUDED.embedding
+                """,
+                (photo_id, vector_str),
+            )
+        self._conn.commit()

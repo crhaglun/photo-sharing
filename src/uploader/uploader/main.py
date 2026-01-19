@@ -10,7 +10,7 @@ from .config import Config
 from .database import Database
 from .folder_metadata import get_folder_metadata, PlaceHint
 from .hash import compute_sha256
-from .image_processing import process_image, ExifData
+from .image_processing import process_image, load_image_with_orientation, ExifData
 from .storage import BlobStorage
 
 
@@ -112,7 +112,8 @@ def cli():
 @click.option("--root", type=click.Path(exists=True, file_okay=False, path_type=Path),
               help="Root directory for folder.yaml inheritance")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed processing information")
-def upload(file_path: Path, root: Path | None, verbose: bool):
+@click.option("--no-embeddings", is_flag=True, help="Skip DINOv2 similarity embeddings")
+def upload(file_path: Path, root: Path | None, verbose: bool, no_embeddings: bool):
     """Upload a single photo with full processing.
 
     FILE_PATH: Path to the photo file to upload.
@@ -184,6 +185,19 @@ def upload(file_path: Path, root: Path | None, verbose: bool):
 
         click.echo(" done.")
 
+        # Generate embeddings (on by default)
+        if no_embeddings:
+            click.echo("  Embedding: disabled (--no-embeddings)")
+        elif db.embedding_exists(photo_id):
+            click.echo("  Embedding: already exists, skipping")
+        else:
+            click.echo("  Generating embedding...", nl=False)
+            from .embeddings import generate_embedding
+            with load_image_with_orientation(file_path) as img:
+                embedding = generate_embedding(img)
+            db.create_image_embedding(photo_id, embedding)
+            click.echo(" done.")
+
     click.echo(f"  Photo ID: {photo_id}")
 
 
@@ -191,7 +205,8 @@ def upload(file_path: Path, root: Path | None, verbose: bool):
 @click.argument("directory", type=click.Path(exists=True, file_okay=False, path_type=Path))
 @click.option("--extensions", default=".jpg,.jpeg,.png", help="Comma-separated file extensions")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed processing information")
-def batch(directory: Path, extensions: str, verbose: bool):
+@click.option("--no-embeddings", is_flag=True, help="Skip DINOv2 similarity embeddings")
+def batch(directory: Path, extensions: str, verbose: bool, no_embeddings: bool):
     """Upload all photos in a directory with full processing.
 
     DIRECTORY: Path to directory containing photos.
@@ -202,6 +217,16 @@ def batch(directory: Path, extensions: str, verbose: bool):
     # Find all matching files
     files = sorted([f for f in directory.rglob("*") if f.suffix.lower() in ext_list])
     click.echo(f"Found {len(files)} files to process")
+
+    # Load embedder once if needed (expensive model loading)
+    embedder = None
+    if no_embeddings:
+        click.echo("Embeddings: disabled (--no-embeddings)")
+    else:
+        click.echo("Loading DINOv2 model...", nl=False)
+        from .embeddings import get_embedder
+        embedder = get_embedder()
+        click.echo(" done.")
 
     storage = BlobStorage(config.storage_account_name)
     processed = 0
@@ -260,6 +285,18 @@ def batch(directory: Path, extensions: str, verbose: bool):
 
                 if exif.camera_make or exif.taken_at:
                     db.create_exif_metadata(photo_id, exif)
+
+                # Generate embedding if enabled
+                if embedder:
+                    if db.embedding_exists(photo_id):
+                        if verbose:
+                            click.echo("  Embedding: exists, skipping")
+                    else:
+                        with load_image_with_orientation(file_path) as img:
+                            embedding = embedder.generate(img)
+                        db.create_image_embedding(photo_id, embedding)
+                        if verbose:
+                            click.echo("  Embedding: generated")
 
                 all_blobs_existed = has_original and has_thumbnail and has_default
                 status = "updated" if all_blobs_existed else "processed"

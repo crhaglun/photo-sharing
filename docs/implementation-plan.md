@@ -75,11 +75,11 @@ Iterative approach - each phase delivers working functionality that can be teste
 
 **Goal:** Generate DINOv2 embeddings for similarity search.
 
-- [ ] Add DINOv2 model loading
-- [ ] Generate embeddings for each photo
-- [ ] Store in image_embeddings table
-- [ ] Add idempotency check
-- [ ] Test embedding generation on batch
+- [x] Add DINOv2 model loading
+- [x] Generate embeddings for each photo
+- [x] Store in image_embeddings table
+- [x] Add idempotency check
+- [x] Test embedding generation on batch
 
 **Deliverable:** All processed photos have similarity embeddings.
 
