@@ -1,9 +1,13 @@
 """PostgreSQL database operations."""
 
+import json
 from datetime import datetime, timezone
+from uuid import UUID, uuid4
 
 import psycopg
 from azure.identity import DefaultAzureCredential
+
+from .image_processing import ExifData
 
 
 class Database:
@@ -53,14 +57,7 @@ class Database:
         self.close()
 
     def photo_exists(self, photo_id: str) -> bool:
-        """Check if a photo record exists.
-
-        Args:
-            photo_id: SHA-256 hash of the photo.
-
-        Returns:
-            True if photo exists in database.
-        """
+        """Check if a photo record exists."""
         if not self._conn:
             raise RuntimeError("Not connected to database")
 
@@ -68,25 +65,178 @@ class Database:
             cur.execute("SELECT 1 FROM photos WHERE id = %s", (photo_id,))
             return cur.fetchone() is not None
 
-    def create_photo(self, photo_id: str, original_filename: str) -> None:
-        """Create a photo record.
+    def has_manual_edits(self, photo_id: str, field_type: str) -> bool:
+        """Check if a photo has manual edits for a field type.
 
         Args:
-            photo_id: SHA-256 hash of the photo.
-            original_filename: Original filename for reference.
+            photo_id: Photo ID.
+            field_type: Field type to check ('date' or 'place').
+
+        Returns:
+            True if there are manual edits for this field.
+        """
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM edit_history WHERE photo_id = %s AND field_type = %s LIMIT 1",
+                (photo_id, field_type),
+            )
+            return cur.fetchone() is not None
+
+    def create_photo(
+        self,
+        photo_id: str,
+        original_filename: str,
+        date_not_earlier_than: datetime | None = None,
+        date_not_later_than: datetime | None = None,
+        place_id: UUID | None = None,
+    ) -> None:
+        """Create or update a photo record.
+
+        If the photo exists and has manual edits for date or place,
+        those fields will not be overwritten.
         """
         if not self._conn:
             raise RuntimeError("Not connected to database")
 
         now = datetime.now(timezone.utc)
 
+        # Check for existing manual edits
+        if self.photo_exists(photo_id):
+            if self.has_manual_edits(photo_id, "date"):
+                date_not_earlier_than = None
+                date_not_later_than = None
+            if self.has_manual_edits(photo_id, "place"):
+                place_id = None
+
         with self._conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO photos (id, original_filename, is_low_quality, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (id) DO NOTHING
+                INSERT INTO photos (id, original_filename, date_not_earlier_than, date_not_later_than,
+                                    place_id, is_low_quality, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    date_not_earlier_than = COALESCE(EXCLUDED.date_not_earlier_than, photos.date_not_earlier_than),
+                    date_not_later_than = COALESCE(EXCLUDED.date_not_later_than, photos.date_not_later_than),
+                    place_id = COALESCE(EXCLUDED.place_id, photos.place_id),
+                    updated_at = EXCLUDED.updated_at
                 """,
-                (photo_id, original_filename, False, now, now),
+                (photo_id, original_filename, date_not_earlier_than, date_not_later_than,
+                 place_id, False, now, now),
             )
         self._conn.commit()
+
+    def create_exif_metadata(self, photo_id: str, exif: ExifData) -> None:
+        """Create or update EXIF metadata record."""
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        raw_json = json.dumps(exif.raw_exif) if exif.raw_exif else None
+
+        with self._conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO exif_metadata (photo_id, camera_make, camera_model, lens, focal_length,
+                                           aperture, shutter_speed, iso, taken_at, raw_exif)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (photo_id) DO UPDATE SET
+                    camera_make = EXCLUDED.camera_make,
+                    camera_model = EXCLUDED.camera_model,
+                    lens = EXCLUDED.lens,
+                    focal_length = EXCLUDED.focal_length,
+                    aperture = EXCLUDED.aperture,
+                    shutter_speed = EXCLUDED.shutter_speed,
+                    iso = EXCLUDED.iso,
+                    taken_at = EXCLUDED.taken_at,
+                    raw_exif = EXCLUDED.raw_exif
+                """,
+                (photo_id, exif.camera_make, exif.camera_model, exif.lens, exif.focal_length,
+                 exif.aperture, exif.shutter_speed, exif.iso, exif.taken_at, raw_json),
+            )
+        self._conn.commit()
+
+    def get_or_create_place(
+        self,
+        name_sv: str,
+        name_en: str,
+        place_type: str,
+        parent_id: UUID | None = None,
+    ) -> UUID:
+        """Get existing place or create new one.
+
+        Args:
+            name_sv: Swedish name.
+            name_en: English name.
+            place_type: Type (country, state, city, street).
+            parent_id: Parent place ID.
+
+        Returns:
+            UUID of the place.
+        """
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            # Try to find existing place
+            if parent_id:
+                cur.execute(
+                    "SELECT id FROM places WHERE name_sv = %s AND parent_id = %s",
+                    (name_sv, parent_id),
+                )
+            else:
+                cur.execute(
+                    "SELECT id FROM places WHERE name_sv = %s AND parent_id IS NULL",
+                    (name_sv,),
+                )
+
+            row = cur.fetchone()
+            if row:
+                return row[0]
+
+            # Create new place
+            place_id = uuid4()
+            cur.execute(
+                """
+                INSERT INTO places (id, name_sv, name_en, type, parent_id)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (place_id, name_sv, name_en, place_type, parent_id),
+            )
+            self._conn.commit()
+            return place_id
+
+    def create_place_hierarchy(
+        self,
+        country: tuple[str, str] | None = None,
+        state: tuple[str, str] | None = None,
+        city: tuple[str, str] | None = None,
+        street: tuple[str, str] | None = None,
+    ) -> UUID | None:
+        """Create place hierarchy and return the most specific place ID.
+
+        Each argument is a tuple of (name_sv, name_en).
+
+        Returns:
+            UUID of the most specific place, or None if no place data.
+        """
+        parent_id: UUID | None = None
+        result_id: UUID | None = None
+
+        if country:
+            result_id = self.get_or_create_place(country[0], country[1], "country", None)
+            parent_id = result_id
+
+        if state:
+            result_id = self.get_or_create_place(state[0], state[1], "state", parent_id)
+            parent_id = result_id
+
+        if city:
+            result_id = self.get_or_create_place(city[0], city[1], "city", parent_id)
+            parent_id = result_id
+
+        if street:
+            result_id = self.get_or_create_place(street[0], street[1], "street", parent_id)
+
+        return result_id

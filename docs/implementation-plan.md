@@ -58,12 +58,14 @@ Iterative approach - each phase delivers working functionality that can be teste
 
 **Goal:** Generate thumbnails and default view images, extract EXIF.
 
-- [ ] Add image resizing (thumbnail: 100px, default: 2048px)
-- [ ] Add EXIF extraction and storage
-- [ ] Add date extraction (populate not_earlier_than / not_later_than)
-- [ ] Update uploader to process all three blob variants
-- [ ] Add idempotency checks (skip if already processed)
-- [ ] Test with a batch of ~100 images
+- [x] Add image resizing (thumbnail: 100px quality=60, default: 2048px quality=92)
+- [x] Add EXIF extraction and storage
+- [x] Add date extraction (populate not_earlier_than / not_later_than)
+  - Priority: folder.yaml → EXIF → file date
+- [x] Add folder.yaml sidecar files for date/place configuration
+- [x] Update uploader to process all three blob variants
+- [x] Add idempotency checks (skip blobs if exist, respect manual edits for metadata)
+- [x] Test with a batch of images
 
 **Deliverable:** Processed images with thumbnails, EXIF data in database.
 

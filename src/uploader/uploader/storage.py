@@ -48,6 +48,31 @@ class BlobStorage:
 
         return blob_client.url
 
+    def upload_bytes(self, container: str, blob_name: str, data: bytes, content_type: str = "image/jpeg") -> str:
+        """Upload bytes to blob storage.
+
+        Args:
+            container: Container name.
+            blob_name: Blob name.
+            data: Bytes to upload.
+            content_type: Content type for the blob.
+
+        Returns:
+            URL of the uploaded blob.
+        """
+        container_client = self.client.get_container_client(container)
+        blob_client = container_client.get_blob_client(blob_name)
+        blob_client.upload_blob(data, content_type=content_type, overwrite=True)
+        return blob_client.url
+
+    def upload_thumbnail(self, photo_id: str, data: bytes) -> str:
+        """Upload thumbnail image."""
+        return self.upload_bytes("thumbnails", photo_id, data)
+
+    def upload_default(self, photo_id: str, data: bytes) -> str:
+        """Upload default view image."""
+        return self.upload_bytes("default", photo_id, data)
+
     def exists(self, container: str, blob_name: str) -> bool:
         """Check if a blob exists.
 
