@@ -42,9 +42,6 @@ export const AuthenticatedImage = ({ src, alt, className, loading }: Authenticat
 
     return () => {
       cancelled = true;
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
     };
   }, [src]);
 
