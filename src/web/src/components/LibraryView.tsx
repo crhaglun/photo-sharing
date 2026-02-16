@@ -87,7 +87,7 @@ export const LibraryView = () => {
   return (
     <div>
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4 mb-4">
+      <div className="bg-white rounded-lg shadow p-4 mb-4 sticky top-0 z-10">
         <div className="flex flex-wrap gap-4 items-end">
           {/* Date filters */}
           <div className="flex gap-2 items-end">
@@ -161,6 +161,15 @@ export const LibraryView = () => {
               Clear filters
             </button>
           )}
+
+          {/* Photo count */}
+          <div className="ml-auto text-sm text-gray-500">
+            {totalCount > 0
+              ? `${totalCount.toLocaleString()} photos`
+              : !loading
+                ? 'No photos found'
+                : null}
+          </div>
         </div>
       </div>
 
@@ -168,16 +177,6 @@ export const LibraryView = () => {
         <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
           <p className="text-red-800">Error loading photos: {error.message}</p>
         </div>
-      )}
-
-      {totalCount > 0 && (
-        <p className="text-sm text-gray-600 mb-4">
-          {photos.length} of {totalCount} photos
-        </p>
-      )}
-
-      {!loading && totalCount === 0 && (
-        <p className="text-sm text-gray-600 mb-4">No photos found</p>
       )}
 
       {/* Photo grid */}
