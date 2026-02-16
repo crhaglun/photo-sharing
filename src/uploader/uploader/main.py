@@ -18,6 +18,7 @@ from .image_processing import (
     create_default_view,
     create_thumbnail,
     extract_exif,
+    get_image_dimensions,
     load_image_with_orientation,
     process_image,
 )
@@ -305,6 +306,9 @@ def process_photo(
         if ctx.existing_photo_places is not None and place_id is not None:
             ctx.existing_photo_places[photo_id] = place_id
 
+    # Get original image dimensions (after orientation correction)
+    img_width, img_height = get_image_dimensions(file_path)
+
     # Create/update photo record (respects manual edits via has_manual_edits check)
     ctx.db.create_photo(
         photo_id=photo_id,
@@ -312,6 +316,8 @@ def process_photo(
         date_not_earlier_than=date_earlier,
         date_not_later_than=date_later,
         place_id=place_id,
+        width=img_width,
+        height=img_height,
     )
 
     # Create EXIF record
@@ -802,7 +808,8 @@ def defaults(directory: Path, extensions: str, verbose: bool):
               help="Root directory for folder.yaml inheritance")
 @click.option("--extensions", default=EXTENSIONS_DEFAULT, help="Comma-separated file extensions")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed processing information")
-def metadata(directory: Path, root: Path | None, extensions: str, verbose: bool):
+@click.option("--force", "-f", is_flag=True, help="Force update of existing records")
+def metadata(directory: Path, root: Path | None, extensions: str, verbose: bool, force: bool):
     """Create photo and EXIF database records. Uses folder.yaml, EXIF, or file dates."""
     config = Config()
     files = find_image_files(directory, extensions)
@@ -821,7 +828,7 @@ def metadata(directory: Path, root: Path | None, extensions: str, verbose: bool)
         for i, file_path in enumerate(files, 1):
             photo_id = compute_sha256(file_path)
 
-            if photo_id in existing:
+            if photo_id in existing and not force:
                 skipped += 1
                 if verbose:
                     click.echo(f"[{i}/{len(files)}] {file_path.relative_to(directory)} - skip")
@@ -849,11 +856,15 @@ def metadata(directory: Path, root: Path | None, extensions: str, verbose: bool)
                     else:
                         click.echo(f"  Date: {date_earlier.date()} to {date_later.date()} (from {date_source})")
 
+                img_width, img_height = get_image_dimensions(file_path)
+
                 db.create_photo(
                     photo_id=photo_id,
                     original_filename=file_path.name,
                     date_not_earlier_than=date_earlier,
                     date_not_later_than=date_later,
+                    width=img_width,
+                    height=img_height,
                 )
 
                 if exif.camera_make or exif.taken_at:

@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '@/services/api';
 import { AuthenticatedImage } from './AuthenticatedImage';
-import type { PhotoDetail, PlaceResponse } from '@/types/api';
+import type { PhotoDetail, PlaceResponse, FaceInPhotoResponse } from '@/types/api';
 
 const FILMSTRIP_RADIUS = 3;
 
@@ -77,6 +77,34 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
     return () => { cancelled = true; };
   }, [showInfo, currentPhotoId]);
 
+  // Face bbox hover
+  const [hoveredFaceId, setHoveredFaceId] = useState<string | null>(null);
+  const imageAreaRef = useRef<HTMLDivElement>(null);
+  const hoveredFace = detail?.faces.find((f) => f.id === hoveredFaceId) ?? null;
+
+  const getBboxStyle = useCallback(
+    (face: FaceInPhotoResponse): React.CSSProperties | null => {
+      if (!detail?.width || !detail?.height || !imageAreaRef.current) return null;
+      const img = imageAreaRef.current.querySelector('img');
+      if (!img) return null;
+
+      const containerRect = imageAreaRef.current.getBoundingClientRect();
+      const imgRect = img.getBoundingClientRect();
+      const offsetX = imgRect.left - containerRect.left;
+      const offsetY = imgRect.top - containerRect.top;
+      const scaleX = imgRect.width / detail.width;
+      const scaleY = imgRect.height / detail.height;
+
+      return {
+        left: offsetX + face.bboxX * scaleX,
+        top: offsetY + face.bboxY * scaleY,
+        width: face.bboxWidth * scaleX,
+        height: face.bboxHeight * scaleY,
+      };
+    },
+    [detail]
+  );
+
   const filmstripIndices = useMemo(() => {
     const start = Math.max(0, index - FILMSTRIP_RADIUS);
     const end = Math.min(photoIds.length - 1, index + FILMSTRIP_RADIUS);
@@ -119,7 +147,7 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
       </div>
 
       {/* Main image area */}
-      <div className="flex-1 min-h-0 flex items-center justify-center relative">
+      <div ref={imageAreaRef} className="flex-1 min-h-0 flex items-center justify-center relative">
         {/* Previous button */}
         {canGoPrev && (
           <button
@@ -152,6 +180,18 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
           alt={`Photo ${index + 1}`}
           className="max-h-full max-w-full object-contain"
         />
+
+        {/* Face bounding box overlay */}
+        {hoveredFace && (() => {
+          const style = getBboxStyle(hoveredFace);
+          if (!style) return null;
+          return (
+            <div
+              className="absolute border-2 border-yellow-400 rounded-sm pointer-events-none"
+              style={style}
+            />
+          );
+        })()}
       </div>
 
       {/* Metadata overlay */}
@@ -178,7 +218,18 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
                 <><dt className="text-white/40">Settings</dt><dd>{[detail.exif.focalLength, detail.exif.aperture, detail.exif.shutterSpeed, detail.exif.iso ? `ISO ${detail.exif.iso}` : null].filter(Boolean).join('  ')}</dd></>
               )}
               {detail.faces.length > 0 && (
-                <><dt className="text-white/40">People</dt><dd>{detail.faces.map((f) => f.personName || f.clusterId || '?').join(', ')}</dd></>
+                <><dt className="text-white/40">People</dt><dd>{detail.faces.map((f, i) => (
+                  <span key={f.id}>
+                    {i > 0 && ', '}
+                    <span
+                      className="cursor-default hover:text-white transition-colors"
+                      onMouseEnter={() => setHoveredFaceId(f.id)}
+                      onMouseLeave={() => setHoveredFaceId(null)}
+                    >
+                      {f.personName || f.clusterId || '?'}
+                    </span>
+                  </span>
+                ))}</dd></>
               )}
             </dl>
           ) : (

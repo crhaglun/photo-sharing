@@ -6,6 +6,8 @@ public class PhotoDetailResponse
     public required string OriginalFilename { get; init; }
     public DateTime? DateNotEarlierThan { get; init; }
     public DateTime? DateNotLaterThan { get; init; }
+    public int? Width { get; init; }
+    public int? Height { get; init; }
     public bool IsLowQuality { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }

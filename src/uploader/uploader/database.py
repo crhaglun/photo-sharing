@@ -92,6 +92,8 @@ class Database:
         date_not_earlier_than: datetime | None = None,
         date_not_later_than: datetime | None = None,
         place_id: UUID | None = None,
+        width: int | None = None,
+        height: int | None = None,
     ) -> None:
         """Create or update a photo record.
 
@@ -115,16 +117,18 @@ class Database:
             cur.execute(
                 """
                 INSERT INTO photos (id, original_filename, date_not_earlier_than, date_not_later_than,
-                                    place_id, is_low_quality, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                    place_id, width, height, is_low_quality, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO UPDATE SET
                     date_not_earlier_than = COALESCE(EXCLUDED.date_not_earlier_than, photos.date_not_earlier_than),
                     date_not_later_than = COALESCE(EXCLUDED.date_not_later_than, photos.date_not_later_than),
                     place_id = COALESCE(EXCLUDED.place_id, photos.place_id),
+                    width = COALESCE(EXCLUDED.width, photos.width),
+                    height = COALESCE(EXCLUDED.height, photos.height),
                     updated_at = EXCLUDED.updated_at
                 """,
                 (photo_id, original_filename, date_not_earlier_than, date_not_later_than,
-                 place_id, False, now, now),
+                 place_id, width, height, False, now, now),
             )
         self._conn.commit()
 

@@ -260,6 +260,20 @@ def extract_exif(file_path: Path) -> ExifData:
     return result
 
 
+def get_image_dimensions(file_path: Path) -> tuple[int, int]:
+    """Get image dimensions after applying EXIF orientation.
+
+    Args:
+        file_path: Path to the image file.
+
+    Returns:
+        Tuple of (width, height) in pixels.
+    """
+    with Image.open(file_path) as img:
+        img = apply_exif_orientation(img)
+        return img.size
+
+
 def apply_exif_orientation(img: Image.Image) -> Image.Image:
     """Apply EXIF orientation to an image.
 

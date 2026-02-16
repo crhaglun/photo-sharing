@@ -31,6 +31,8 @@ export interface PhotoDetail {
   originalFilename: string;
   dateNotEarlierThan: string | null;
   dateNotLaterThan: string | null;
+  width: number | null;
+  height: number | null;
   isLowQuality: boolean;
   createdAt: string;
   updatedAt: string;

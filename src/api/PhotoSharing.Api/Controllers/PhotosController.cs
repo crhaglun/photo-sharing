@@ -123,6 +123,8 @@ public class PhotosController : ControllerBase
             OriginalFilename = photo.OriginalFilename,
             DateNotEarlierThan = photo.DateNotEarlierThan,
             DateNotLaterThan = photo.DateNotLaterThan,
+            Width = photo.Width,
+            Height = photo.Height,
             IsLowQuality = photo.IsLowQuality,
             CreatedAt = photo.CreatedAt,
             UpdatedAt = photo.UpdatedAt,

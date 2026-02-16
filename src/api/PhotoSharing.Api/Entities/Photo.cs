@@ -25,6 +25,12 @@ public class Photo
     [Column("place_id")]
     public Guid? PlaceId { get; set; }
 
+    [Column("width")]
+    public int? Width { get; set; }
+
+    [Column("height")]
+    public int? Height { get; set; }
+
     [Column("is_low_quality")]
     public bool IsLowQuality { get; set; }
 
