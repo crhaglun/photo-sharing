@@ -4,7 +4,6 @@ param location string
 param vnetName string
 param postgresSubnetName string = 'snet-postgres'
 param privateEndpointSubnetName string = 'snet-privateendpoints'
-param gatewaySubnetName string
 
 resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
   name: vnetName
@@ -37,12 +36,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
           privateEndpointNetworkPolicies: 'Disabled'
         }
       }
-      {
-        name: gatewaySubnetName
-        properties: {
-          addressPrefix: '10.0.255.0/27'
-        }
-      }
     ]
   }
 }
@@ -51,4 +44,3 @@ output vnetId string = vnet.id
 output vnetName string = vnet.name
 output postgresSubnetId string = vnet.properties.subnets[0].id
 output privateEndpointSubnetId string = vnet.properties.subnets[1].id
-output gatewaySubnetId string = vnet.properties.subnets[2].id

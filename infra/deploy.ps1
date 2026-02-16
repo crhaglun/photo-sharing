@@ -79,11 +79,9 @@ Write-Host "  Developer:    $developerEmail"
 Write-Host ""
 Write-Host "This will create:" -ForegroundColor Yellow
 Write-Host "  - Resource Group: rg-$BaseName"
-Write-Host "  - Virtual Network with VPN Gateway"
+Write-Host "  - Virtual Network"
 Write-Host "  - PostgreSQL Flexible Server (Burstable B1ms)"
 Write-Host "  - Storage Account with private endpoint"
-Write-Host ""
-Write-Host "NOTE: VPN Gateway takes 30-45 minutes to deploy." -ForegroundColor Yellow
 Write-Host ""
 
 $confirm = Read-Host "Proceed with deployment? (y/N)"
@@ -121,12 +119,15 @@ Write-Host "Duration: $($duration.ToString('hh\:mm\:ss'))" -ForegroundColor Gree
 
 # Output next steps
 Write-Host "`nNext Steps:" -ForegroundColor Cyan
-Write-Host "1. Download VPN client configuration:"
+Write-Host "1. Deploy VPN Gateway for developer access:"
+Write-Host "   ./infra/deploy-vpn.ps1"
+Write-Host ""
+Write-Host "2. Download VPN client configuration:"
 Write-Host "   ./infra/get-vpn-config.ps1"
 Write-Host ""
-Write-Host "2. Install Azure VPN Client from Microsoft Store (if needed) and import the configuration"
+Write-Host "3. Install Azure VPN Client from Microsoft Store (if needed) and import the configuration"
 Write-Host ""
-Write-Host "3. Connect to VPN, then test PostgreSQL connection:"
+Write-Host "4. Connect to VPN, then test PostgreSQL connection:"
 Write-Host "   psql ""host=psql-$BaseName.postgres.database.azure.com dbname=postgres user=$developerEmail sslmode=require"""
 Write-Host ""
-Write-Host "4. Deploy database schema (see docs/design/database-schema.md)"
+Write-Host "5. Deploy database schema (see docs/design/database-schema.md)"

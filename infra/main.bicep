@@ -1,5 +1,6 @@
 // Photo Sharing - Phase 1 Infrastructure
-// Deploys: VNet, VPN Gateway, PostgreSQL, Blob Storage (all private)
+// Deploys: VNet, PostgreSQL, Blob Storage (all private)
+// VPN Gateway is deployed separately via vpn.bicep
 
 targetScope = 'subscription'
 
@@ -15,9 +16,6 @@ param developerObjectId string
 @description('Email/UPN of the developer user (for PostgreSQL Entra admin)')
 param developerEmail string
 
-@description('VPN client address pool (CIDR)')
-param vpnClientAddressPool string = '10.100.0.0/24'
-
 @description('PostgreSQL administrator password (for initial setup, Entra auth used thereafter)')
 @secure()
 param postgresAdminPassword string
@@ -25,9 +23,6 @@ param postgresAdminPassword string
 // Variables
 var resourceGroupName = 'rg-${baseName}'
 var vnetName = 'vnet-${baseName}'
-var gatewaySubnetName = 'GatewaySubnet'
-var vpnGatewayName = 'vpng-${baseName}'
-var vpnPublicIpName = 'pip-${baseName}-vpn'
 var postgresServerName = 'psql-${baseName}'
 var storageAccountName = replace('st${baseName}', '-', '')
 var storagePrivateEndpointName = 'pe-${baseName}-storage'
@@ -45,20 +40,6 @@ module networking 'modules/networking.bicep' = {
   params: {
     location: location
     vnetName: vnetName
-    gatewaySubnetName: gatewaySubnetName
-  }
-}
-
-// Deploy VPN Gateway
-module vpnGateway 'modules/vpn-gateway.bicep' = {
-  scope: rg
-  name: 'vpnGateway'
-  params: {
-    location: location
-    vpnGatewayName: vpnGatewayName
-    publicIpName: vpnPublicIpName
-    gatewaySubnetId: networking.outputs.gatewaySubnetId
-    vpnClientAddressPool: vpnClientAddressPool
   }
 }
 
@@ -94,7 +75,6 @@ module storage 'modules/storage.bicep' = {
 // Outputs
 output resourceGroupName string = rg.name
 output vnetName string = networking.outputs.vnetName
-output vpnGatewayName string = vpnGateway.outputs.vpnGatewayName
 output postgresServerName string = postgres.outputs.serverName
 output postgresServerFqdn string = postgres.outputs.serverFqdn
 output storageAccountName string = storage.outputs.storageAccountName

@@ -1,14 +1,38 @@
-// VPN Gateway module - Point-to-Site VPN
+// VPN Gateway - Point-to-Site VPN for developer access
+// Deployed separately from main infrastructure (takes 30-45 minutes)
 
-param location string
-param vpnGatewayName string
-param publicIpName string
-param gatewaySubnetId string
-param vpnClientAddressPool string
+@description('Azure region')
+param location string = 'swedencentral'
+
+@description('Base name for resources')
+param baseName string = 'photosharing'
+
+@description('VPN client address pool (CIDR)')
+param vpnClientAddressPool string = '10.100.0.0/24'
+
+// Variables
+var vnetName = 'vnet-${baseName}'
+var gatewaySubnetName = 'GatewaySubnet'
+var vpnGatewayName = 'vpng-${baseName}'
+var vpnPublicIpName = 'pip-${baseName}-vpn'
+
+// Reference existing VNet
+resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' existing = {
+  name: vnetName
+}
+
+// GatewaySubnet (required by Azure VPN Gateway, must be named exactly 'GatewaySubnet')
+resource gatewaySubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
+  parent: vnet
+  name: gatewaySubnetName
+  properties: {
+    addressPrefix: '10.0.255.0/27'
+  }
+}
 
 // Public IP for VPN Gateway
 resource publicIp 'Microsoft.Network/publicIPAddresses@2023-05-01' = {
-  name: publicIpName
+  name: vpnPublicIpName
   location: location
   sku: {
     name: 'Standard'
@@ -35,7 +59,7 @@ resource vpnGateway 'Microsoft.Network/virtualNetworkGateways@2023-05-01' = {
         properties: {
           privateIPAllocationMethod: 'Dynamic'
           subnet: {
-            id: gatewaySubnetId
+            id: gatewaySubnet.id
           }
           publicIPAddress: {
             id: publicIp.id
@@ -57,5 +81,4 @@ resource vpnGateway 'Microsoft.Network/virtualNetworkGateways@2023-05-01' = {
 }
 
 output vpnGatewayName string = vpnGateway.name
-output vpnGatewayId string = vpnGateway.id
 output publicIpAddress string = publicIp.properties.ipAddress
