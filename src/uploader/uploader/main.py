@@ -822,7 +822,6 @@ def metadata(directory: Path, root: Path | None, extensions: str, verbose: bool,
 
         created = 0
         skipped = 0
-        errors = 0
         folder_cache: dict[Path, object] = {}
 
         for i, file_path in enumerate(files, 1):
@@ -874,9 +873,9 @@ def metadata(directory: Path, root: Path | None, extensions: str, verbose: bool,
                 created += 1
             except Exception as e:
                 click.echo(f"  Error: {e}", err=True)
-                errors += 1
+                raise
 
-    click.echo(f"\nDone! Created: {created}, Skipped: {skipped}, Errors: {errors}")
+    click.echo(f"\nDone! Created: {created}, Skipped: {skipped}")
 
 
 @cli.command()

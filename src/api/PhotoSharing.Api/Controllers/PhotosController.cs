@@ -48,13 +48,16 @@ public class PhotosController : ControllerBase
             query = query.Where(p => p.Visibility == Entities.PhotoVisibility.Visible);
 
         // Filter by date range (intersection)
+        // Ensure dates are UTC — query strings bind as Kind=Unspecified which Npgsql rejects for timestamptz
         if (request.DateStart.HasValue)
         {
-            query = query.Where(p => p.DateNotLaterThan == null || p.DateNotLaterThan >= request.DateStart.Value);
+            var dateStart = DateTime.SpecifyKind(request.DateStart.Value, DateTimeKind.Utc);
+            query = query.Where(p => p.DateNotLaterThan == null || p.DateNotLaterThan >= dateStart);
         }
         if (request.DateEnd.HasValue)
         {
-            query = query.Where(p => p.DateNotEarlierThan == null || p.DateNotEarlierThan <= request.DateEnd.Value);
+            var dateEnd = DateTime.SpecifyKind(request.DateEnd.Value, DateTimeKind.Utc);
+            query = query.Where(p => p.DateNotEarlierThan == null || p.DateNotEarlierThan <= dateEnd);
         }
 
         // Filter by place (including descendants)
