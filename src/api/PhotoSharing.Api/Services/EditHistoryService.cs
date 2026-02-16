@@ -18,6 +18,7 @@ public class EditHistoryService : IEditHistoryService
         string fieldKey,
         string? oldValue,
         string? newValue,
+        string changedBy,
         CancellationToken cancellationToken = default)
     {
         var entry = new EditHistory
@@ -28,7 +29,7 @@ public class EditHistoryService : IEditHistoryService
             FieldKey = fieldKey,
             OldValue = oldValue,
             NewValue = newValue,
-            ChangedBy = "system", // TODO: Replace with Firebase UID when auth is added
+            ChangedBy = changedBy,
             ChangedAt = DateTime.UtcNow
         };
 

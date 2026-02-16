@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using PhotoSharing.Api.Data;
 using PhotoSharing.Api.DTOs;
 using PhotoSharing.Api.DTOs.Photos;
+using PhotoSharing.Api.Extensions;
 using PhotoSharing.Api.Services;
 
 namespace PhotoSharing.Api.Controllers;
@@ -176,13 +177,15 @@ public class PhotosController : ControllerBase
         }
 
         // Track changes for edit history
+        var userId = User.GetUserId();
+
         if (request.DateNotEarlierThan.HasValue && request.DateNotEarlierThan != photo.DateNotEarlierThan)
         {
             await _editHistoryService.RecordEditAsync(
                 id, "date", "date_not_earlier_than",
                 photo.DateNotEarlierThan?.ToString("o"),
                 request.DateNotEarlierThan.Value.ToString("o"),
-                cancellationToken);
+                userId, cancellationToken);
             photo.DateNotEarlierThan = request.DateNotEarlierThan.Value;
         }
 
@@ -192,7 +195,7 @@ public class PhotosController : ControllerBase
                 id, "date", "date_not_later_than",
                 photo.DateNotLaterThan?.ToString("o"),
                 request.DateNotLaterThan.Value.ToString("o"),
-                cancellationToken);
+                userId, cancellationToken);
             photo.DateNotLaterThan = request.DateNotLaterThan.Value;
         }
 
@@ -202,7 +205,7 @@ public class PhotosController : ControllerBase
                 id, "place", "place_id",
                 photo.PlaceId?.ToString(),
                 request.PlaceId.Value.ToString(),
-                cancellationToken);
+                userId, cancellationToken);
             photo.PlaceId = request.PlaceId.Value;
         }
 
@@ -217,7 +220,7 @@ public class PhotosController : ControllerBase
                 id, "visibility", "visibility",
                 photo.Visibility,
                 request.Visibility,
-                cancellationToken);
+                userId, cancellationToken);
             photo.Visibility = request.Visibility;
         }
 

@@ -8,5 +8,6 @@ public interface IEditHistoryService
         string fieldKey,
         string? oldValue,
         string? newValue,
+        string changedBy,
         CancellationToken cancellationToken = default);
 }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PhotoSharing.Api.Data;
 using PhotoSharing.Api.DTOs.Faces;
+using PhotoSharing.Api.Extensions;
 using PhotoSharing.Api.Services;
 
 namespace PhotoSharing.Api.Controllers;
@@ -92,13 +93,14 @@ public class FacesController : ControllerBase
         }
 
         // Record edit history
+        var userId = User.GetUserId();
         await _editHistoryService.RecordEditAsync(
             face.PhotoId,
             "face_person",
             face.Id.ToString(),
             face.PersonId?.ToString(),
             request.PersonId?.ToString(),
-            cancellationToken);
+            userId, cancellationToken);
 
         face.PersonId = request.PersonId;
         await _context.SaveChangesAsync(cancellationToken);
