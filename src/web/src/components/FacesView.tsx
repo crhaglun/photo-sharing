@@ -4,10 +4,13 @@ import { api } from '@/services/api';
 import { AuthenticatedImage } from './AuthenticatedImage';
 import type { PersonResponse, FaceCluster } from '@/types/api';
 
+const PAGE_SIZE = 5;
+
 export const FacesView = () => {
   const { clusters, loading, error, fetchClusters } = useFaceClusters();
   const [persons, setPersons] = useState<PersonResponse[]>([]);
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   useEffect(() => {
     fetchClusters();
@@ -77,14 +80,17 @@ export const FacesView = () => {
     );
   }
 
+  const visibleClusters = clusters.slice(0, visibleCount);
+  const hasMore = visibleCount < clusters.length;
+
   return (
     <div>
       <p className="text-sm text-gray-600 mb-4">
-        {clusters.length} clusters with unassigned faces
+        Showing {visibleClusters.length} of {clusters.length} clusters with unassigned faces
       </p>
 
       <div className="space-y-6">
-        {clusters.map((cluster) => (
+        {visibleClusters.map((cluster) => (
           <ClusterCard
             key={cluster.clusterId}
             cluster={cluster}
@@ -94,6 +100,17 @@ export const FacesView = () => {
           />
         ))}
       </div>
+
+      {hasMore && (
+        <div className="text-center mt-6">
+          <button
+            onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
+            className="px-6 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-200"
+          >
+            Show more clusters ({clusters.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -105,9 +122,15 @@ interface ClusterCardProps {
   onAssign: (name: string) => void;
 }
 
+const FACES_PAGE_SIZE = 5;
+
 const ClusterCard = ({ cluster, persons, isAssigning, onAssign }: ClusterCardProps) => {
   const [name, setName] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const visibleFaces = expanded ? cluster.faces : cluster.faces.slice(0, FACES_PAGE_SIZE);
+  const hiddenCount = cluster.faces.length - FACES_PAGE_SIZE;
 
   const filteredPersons = name.trim()
     ? persons.filter((p) =>
@@ -131,7 +154,7 @@ const ClusterCard = ({ cluster, persons, isAssigning, onAssign }: ClusterCardPro
   return (
     <div className="bg-white rounded-lg shadow p-4">
       <div className="flex flex-wrap gap-2 mb-4">
-        {cluster.faces.map((face) => (
+        {visibleFaces.map((face) => (
           <div
             key={face.id}
             className="w-[80px] h-[80px] bg-gray-200 rounded overflow-hidden"
@@ -144,6 +167,14 @@ const ClusterCard = ({ cluster, persons, isAssigning, onAssign }: ClusterCardPro
             />
           </div>
         ))}
+        {hiddenCount > 0 && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="w-[80px] h-[80px] bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500 hover:bg-gray-200"
+          >
+            {expanded ? 'Show less' : `+${hiddenCount} more`}
+          </button>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="relative">

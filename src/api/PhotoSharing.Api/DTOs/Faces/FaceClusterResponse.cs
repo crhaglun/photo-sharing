@@ -4,6 +4,7 @@ public class FaceClusterResponse
 {
     public required string ClusterId { get; init; }
     public required List<FaceInClusterResponse> Faces { get; init; }
+    public int TotalFaces { get; init; }
 }
 
 public class FaceInClusterResponse

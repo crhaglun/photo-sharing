@@ -24,26 +24,52 @@ public class FacesController : ControllerBase
     [HttpGet("clusters")]
     public async Task<ActionResult<List<FaceClusterResponse>>> GetClusters(CancellationToken cancellationToken)
     {
-        // Get unassigned faces grouped by cluster
-        var clusters = await _context.Faces
+        // Load all unassigned clustered faces
+        var faces = await _context.Faces
             .Where(f => f.PersonId == null && f.ClusterId != null)
-            .GroupBy(f => f.ClusterId)
-            .Select(g => new FaceClusterResponse
-            {
-                ClusterId = g.Key!,
-                Faces = g.Select(f => new FaceInClusterResponse
-                {
-                    Id = f.Id,
-                    PhotoId = f.PhotoId,
-                    BboxX = f.BboxX,
-                    BboxY = f.BboxY,
-                    BboxWidth = f.BboxWidth,
-                    BboxHeight = f.BboxHeight
-                }).ToList()
-            })
             .ToListAsync(cancellationToken);
 
+        // Group by cluster and order faces by embedding magnitude (quality)
+        var clusters = faces
+            .GroupBy(f => f.ClusterId!)
+            .Select(g => new FaceClusterResponse
+            {
+                ClusterId = g.Key,
+                TotalFaces = g.Count(),
+                Faces = OrderFacesByQuality(g).ToList()
+            })
+            .OrderByDescending(c => c.TotalFaces)
+            .ToList();
+
         return clusters;
+    }
+
+    private static IEnumerable<FaceInClusterResponse> OrderFacesByQuality(IEnumerable<Entities.Face> faces)
+    {
+        // Calculate embedding magnitude for each face and order by quality (highest first)
+        return faces
+            .Select(f => new
+            {
+                Face = f,
+                Magnitude = CalculateEmbeddingMagnitude(f.Embedding)
+            })
+            .OrderByDescending(x => x.Magnitude)
+            .Select(x => new FaceInClusterResponse
+            {
+                Id = x.Face.Id,
+                PhotoId = x.Face.PhotoId,
+                BboxX = x.Face.BboxX,
+                BboxY = x.Face.BboxY,
+                BboxWidth = x.Face.BboxWidth,
+                BboxHeight = x.Face.BboxHeight
+            });
+    }
+
+    private static double CalculateEmbeddingMagnitude(Pgvector.Vector embedding)
+    {
+        // L2 norm: sqrt(sum of squares)
+        var values = embedding.ToArray();
+        return Math.Sqrt(values.Sum(x => x * x));
     }
 
     [HttpPatch("{id}")]
