@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '@/services/api';
+import { getIdToken } from '@/services/firebase';
 import { AuthenticatedImage } from './AuthenticatedImage';
 import type { PhotoDetail, PhotoVisibility, PlaceResponse, NavigationTarget } from '@/types/api';
 
@@ -143,6 +144,25 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
     return indices;
   }, [index, photoIds.length, filmstripRadius]);
 
+  const handleDownload = useCallback(async () => {
+    const token = await getIdToken();
+    const response = await fetch(api.getOriginalUrl(currentPhotoId), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition');
+    const filenameMatch = disposition?.match(/filename="?(.+?)"?(?:;|$)/);
+    const filename = filenameMatch?.[1] || `${currentPhotoId}.jpg`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [currentPhotoId]);
+
   const handleVisibilityChange = useCallback(async (visibility: PhotoVisibility) => {
     if (!detail || detail.visibility === visibility) return;
     await api.updatePhoto(currentPhotoId, { visibility });
@@ -176,6 +196,16 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
             </svg>
           </button>
         )}
+        <button
+          onClick={handleDownload}
+          className="text-white/70 hover:text-white p-2 cursor-pointer"
+          aria-label="Download original"
+          title="Download original"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 18h16" />
+          </svg>
+        </button>
         <button
           onClick={() => setShowInfo((v) => { stickyShowInfo = !v; return !v; })}
           className={`p-2 cursor-pointer ${showInfo ? 'text-white' : 'text-white/70 hover:text-white'}`}
