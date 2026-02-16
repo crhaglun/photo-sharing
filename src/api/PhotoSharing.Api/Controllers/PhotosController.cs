@@ -143,6 +143,7 @@ public class PhotosController : ControllerBase
                 Id = f.Id,
                 PersonId = f.PersonId,
                 PersonName = f.Person?.Name,
+                ClusterId = f.ClusterId,
                 BboxX = f.BboxX,
                 BboxY = f.BboxY,
                 BboxWidth = f.BboxWidth,

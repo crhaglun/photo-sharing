@@ -41,6 +41,7 @@ public class FaceInPhotoResponse
     public Guid Id { get; init; }
     public Guid? PersonId { get; init; }
     public string? PersonName { get; init; }
+    public string? ClusterId { get; init; }
     public int BboxX { get; init; }
     public int BboxY { get; init; }
     public int BboxWidth { get; init; }

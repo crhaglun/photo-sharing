@@ -63,6 +63,7 @@ export interface FaceInPhotoResponse {
   id: string;
   personId: string | null;
   personName: string | null;
+  clusterId: string | null;
   bboxX: number;
   bboxY: number;
   bboxWidth: number;
