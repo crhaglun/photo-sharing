@@ -4,6 +4,7 @@ import { AuthenticatedImage } from './AuthenticatedImage';
 import type { PhotoDetail, PhotoVisibility, PlaceResponse, FaceInPhotoResponse } from '@/types/api';
 
 const FILMSTRIP_RADIUS = 3;
+let stickyShowInfo = false;
 
 interface PhotoViewerProps {
   photoIds: string[];
@@ -64,7 +65,7 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
   const currentPhotoId = photoIds[index];
 
   // Metadata pane
-  const [showInfo, setShowInfo] = useState(false);
+  const [showInfo, setShowInfo] = useState(stickyShowInfo);
   const [detail, setDetail] = useState<PhotoDetail | null>(null);
 
   useEffect(() => {
@@ -132,7 +133,7 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
       {/* Top-right controls */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
         <button
-          onClick={() => setShowInfo((v) => !v)}
+          onClick={() => setShowInfo((v) => { stickyShowInfo = !v; return !v; })}
           className={`p-2 cursor-pointer ${showInfo ? 'text-white' : 'text-white/70 hover:text-white'}`}
           aria-label="Toggle info"
         >
