@@ -121,3 +121,7 @@ export interface DateRange {
   minDate: string | null;
   maxDate: string | null;
 }
+
+export type NavigationTarget =
+  | { type: 'person'; personId: string }
+  | { type: 'cluster'; clusterId: string };

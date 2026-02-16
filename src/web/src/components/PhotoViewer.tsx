@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '@/services/api';
 import { AuthenticatedImage } from './AuthenticatedImage';
-import type { PhotoDetail, PhotoVisibility, PlaceResponse, FaceInPhotoResponse } from '@/types/api';
+import type { PhotoDetail, PhotoVisibility, PlaceResponse, NavigationTarget } from '@/types/api';
 
 const FILMSTRIP_THUMB_SIZE = 60;
 const FILMSTRIP_GAP = 4;
@@ -14,9 +14,10 @@ interface PhotoViewerProps {
   onClose: () => void;
   onIndexChange: (index: number) => void;
   onReachEnd?: () => void;
+  onNavigate?: (target: NavigationTarget) => void;
 }
 
-export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, onReachEnd }: PhotoViewerProps) => {
+export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, onReachEnd, onNavigate }: PhotoViewerProps) => {
   const [index, setIndex] = useState(currentIndex);
 
   useEffect(() => {
@@ -84,29 +85,33 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
   const [hoveredFaceId, setHoveredFaceId] = useState<string | null>(null);
   const imageAreaRef = useRef<HTMLDivElement>(null);
   const hoveredFace = detail?.faces.find((f) => f.id === hoveredFaceId) ?? null;
+  const [bboxStyle, setBboxStyle] = useState<React.CSSProperties | null>(null);
 
-  const getBboxStyle = useCallback(
-    (face: FaceInPhotoResponse): React.CSSProperties | null => {
-      if (!detail?.width || !detail?.height || !imageAreaRef.current) return null;
-      const img = imageAreaRef.current.querySelector('img');
-      if (!img) return null;
+  useEffect(() => {
+    if (!hoveredFace || !detail?.width || !detail?.height || !imageAreaRef.current) {
+      setBboxStyle(null);
+      return;
+    }
+    const img = imageAreaRef.current.querySelector('img');
+    if (!img) {
+      setBboxStyle(null);
+      return;
+    }
 
-      const containerRect = imageAreaRef.current.getBoundingClientRect();
-      const imgRect = img.getBoundingClientRect();
-      const offsetX = imgRect.left - containerRect.left;
-      const offsetY = imgRect.top - containerRect.top;
-      const scaleX = imgRect.width / detail.width;
-      const scaleY = imgRect.height / detail.height;
+    const containerRect = imageAreaRef.current.getBoundingClientRect();
+    const imgRect = img.getBoundingClientRect();
+    const offsetX = imgRect.left - containerRect.left;
+    const offsetY = imgRect.top - containerRect.top;
+    const scaleX = imgRect.width / detail.width;
+    const scaleY = imgRect.height / detail.height;
 
-      return {
-        left: offsetX + face.bboxX * scaleX,
-        top: offsetY + face.bboxY * scaleY,
-        width: face.bboxWidth * scaleX,
-        height: face.bboxHeight * scaleY,
-      };
-    },
-    [detail]
-  );
+    setBboxStyle({
+      left: offsetX + hoveredFace.bboxX * scaleX,
+      top: offsetY + hoveredFace.bboxY * scaleY,
+      width: hoveredFace.bboxWidth * scaleX,
+      height: hoveredFace.bboxHeight * scaleY,
+    });
+  }, [hoveredFace, detail]);
 
   // Dynamic filmstrip sizing based on window width
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -213,16 +218,12 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
         />
 
         {/* Face bounding box overlay */}
-        {hoveredFace && (() => {
-          const style = getBboxStyle(hoveredFace);
-          if (!style) return null;
-          return (
-            <div
-              className="absolute border-2 border-yellow-400 rounded-sm pointer-events-none"
-              style={style}
-            />
-          );
-        })()}
+        {bboxStyle && (
+          <div
+            className="absolute border-2 border-yellow-400 rounded-sm pointer-events-none"
+            style={bboxStyle}
+          />
+        )}
       </div>
 
       {/* Metadata overlay */}
@@ -249,18 +250,25 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
                 <><dt className="text-white/40">Settings</dt><dd>{[detail.exif.focalLength, detail.exif.aperture, detail.exif.shutterSpeed, detail.exif.iso ? `ISO ${detail.exif.iso}` : null].filter(Boolean).join('  ')}</dd></>
               )}
               {detail.faces.length > 0 && (
-                <><dt className="text-white/40">People</dt><dd>{detail.faces.map((f, i) => (
-                  <span key={f.id}>
-                    {i > 0 && ', '}
-                    <span
-                      className="cursor-default hover:text-white transition-colors"
-                      onMouseEnter={() => setHoveredFaceId(f.id)}
-                      onMouseLeave={() => setHoveredFaceId(null)}
-                    >
-                      {f.personName || f.clusterId || '?'}
+                <><dt className="text-white/40">People</dt><dd>{detail.faces.map((f, i) => {
+                  const canNavigate = onNavigate && (f.personId || f.clusterId);
+                  return (
+                    <span key={f.id}>
+                      {i > 0 && ', '}
+                      <span
+                        className={`hover:text-white transition-colors ${canNavigate ? 'cursor-pointer underline decoration-dotted underline-offset-2' : 'cursor-default'}`}
+                        onMouseEnter={() => setHoveredFaceId(f.id)}
+                        onMouseLeave={() => setHoveredFaceId(null)}
+                        onClick={canNavigate ? () => {
+                          if (f.personId) onNavigate({ type: 'person', personId: f.personId });
+                          else if (f.clusterId) onNavigate({ type: 'cluster', clusterId: f.clusterId });
+                        } : undefined}
+                      >
+                        {f.personName || f.clusterId || '?'}
+                      </span>
                     </span>
-                  </span>
-                ))}</dd></>
+                  );
+                })}</dd></>
               )}
               <dt className="text-white/40">Visibility</dt>
               <dd>

@@ -4,9 +4,14 @@ import { api } from '@/services/api';
 import { PlaceTreeSelector } from './PlaceTreeSelector';
 import { PhotoThumbnail } from './PhotoThumbnail';
 import { PhotoViewer } from './PhotoViewer';
-import type { PersonResponse, Place, PhotoListParams, DateRange } from '@/types/api';
+import type { PersonResponse, Place, PhotoListParams, DateRange, NavigationTarget } from '@/types/api';
 
-export const LibraryView = () => {
+interface LibraryViewProps {
+  initialPersonId?: string;
+  onNavigate?: (target: NavigationTarget) => void;
+}
+
+export const LibraryView = ({ initialPersonId, onNavigate }: LibraryViewProps) => {
   const { photos, loading, error, hasMore, totalCount, fetchPhotos, loadMore } = usePhotos();
   const loaderRef = useRef<HTMLDivElement>(null);
 
@@ -14,7 +19,9 @@ export const LibraryView = () => {
   const [persons, setPersons] = useState<PersonResponse[]>([]);
   const [places, setPlaces] = useState<Place[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
-  const [filters, setFilters] = useState<Omit<PhotoListParams, 'page' | 'pageSize'>>({});
+  const [filters, setFilters] = useState<Omit<PhotoListParams, 'page' | 'pageSize'>>(
+    initialPersonId ? { personId: initialPersonId } : {}
+  );
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   // Load filter options on mount
@@ -198,6 +205,7 @@ export const LibraryView = () => {
           onClose={() => setViewerIndex(null)}
           onIndexChange={setViewerIndex}
           onReachEnd={hasMore ? loadMore : undefined}
+          onNavigate={onNavigate}
         />
       )}
 

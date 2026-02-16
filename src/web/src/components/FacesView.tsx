@@ -1,22 +1,43 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFaceClusters } from '@/hooks/useApi';
 import { api } from '@/services/api';
 import { PhotoThumbnail } from './PhotoThumbnail';
 import { PhotoViewer } from './PhotoViewer';
-import type { PersonResponse, FaceCluster } from '@/types/api';
+import type { PersonResponse, FaceCluster, NavigationTarget } from '@/types/api';
 
 const PAGE_SIZE = 5;
 
-export const FacesView = () => {
+interface FacesViewProps {
+  initialClusterId?: string;
+  onNavigate?: (target: NavigationTarget) => void;
+}
+
+export const FacesView = ({ initialClusterId, onNavigate }: FacesViewProps) => {
   const { clusters, loading, error, fetchClusters } = useFaceClusters();
   const [persons, setPersons] = useState<PersonResponse[]>([]);
   const [assigning, setAssigning] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const clusterRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   useEffect(() => {
     fetchClusters();
     loadPersons();
   }, [fetchClusters]);
+
+  // Scroll to initial cluster when clusters are loaded
+  useEffect(() => {
+    if (!initialClusterId || clusters.length === 0) return;
+    const clusterIndex = clusters.findIndex((c) => c.clusterId === initialClusterId);
+    if (clusterIndex === -1) return;
+    // Ensure the cluster is visible (expand pagination if needed)
+    if (clusterIndex >= visibleCount) {
+      setVisibleCount(clusterIndex + 1);
+    }
+    // Scroll into view after render
+    requestAnimationFrame(() => {
+      clusterRefs.current.get(initialClusterId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [initialClusterId, clusters, visibleCount]);
 
   const loadPersons = async () => {
     try {
@@ -94,10 +115,13 @@ export const FacesView = () => {
         {visibleClusters.map((cluster) => (
           <ClusterCard
             key={cluster.clusterId}
+            ref={(el) => { if (el) clusterRefs.current.set(cluster.clusterId, el); else clusterRefs.current.delete(cluster.clusterId); }}
             cluster={cluster}
             persons={persons}
             isAssigning={assigning === cluster.clusterId}
             onAssign={(name) => handleAssign(cluster, name)}
+            onNavigate={onNavigate}
+            highlight={cluster.clusterId === initialClusterId}
           />
         ))}
       </div>
@@ -121,11 +145,14 @@ interface ClusterCardProps {
   persons: PersonResponse[];
   isAssigning: boolean;
   onAssign: (name: string) => void;
+  onNavigate?: (target: NavigationTarget) => void;
+  highlight?: boolean;
+  ref?: React.Ref<HTMLDivElement>;
 }
 
 const FACES_PAGE_SIZE = 5;
 
-const ClusterCard = ({ cluster, persons, isAssigning, onAssign }: ClusterCardProps) => {
+const ClusterCard = ({ cluster, persons, isAssigning, onAssign, onNavigate, highlight, ref }: ClusterCardProps) => {
   const [name, setName] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -155,7 +182,7 @@ const ClusterCard = ({ cluster, persons, isAssigning, onAssign }: ClusterCardPro
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-4">
+    <div ref={ref} className={`bg-white rounded-lg shadow p-4${highlight ? ' ring-2 ring-blue-500' : ''}`}>
       <div className="flex flex-wrap gap-px mb-4">
         {visibleFaces.map((face) => (
           <PhotoThumbnail
@@ -219,6 +246,7 @@ const ClusterCard = ({ cluster, persons, isAssigning, onAssign }: ClusterCardPro
           currentIndex={viewerIndex}
           onClose={() => setViewerIndex(null)}
           onIndexChange={setViewerIndex}
+          onNavigate={onNavigate}
         />
       )}
     </div>
