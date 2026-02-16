@@ -6,13 +6,15 @@ export interface PagedResponse<T> {
   totalPages: number;
 }
 
+export type PhotoVisibility = 'visible' | 'low_quality' | 'deleted';
+
 export interface PhotoSummary {
   id: string;
   originalFilename: string;
   dateNotEarlierThan: string | null;
   dateNotLaterThan: string | null;
   placeName: string | null;
-  isLowQuality: boolean;
+  visibility: PhotoVisibility;
   faceCount: number;
 }
 
@@ -33,7 +35,7 @@ export interface PhotoDetail {
   dateNotLaterThan: string | null;
   width: number | null;
   height: number | null;
-  isLowQuality: boolean;
+  visibility: PhotoVisibility;
   createdAt: string;
   updatedAt: string;
   place: PlaceResponse | null;

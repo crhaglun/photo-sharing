@@ -117,7 +117,7 @@ class Database:
             cur.execute(
                 """
                 INSERT INTO photos (id, original_filename, date_not_earlier_than, date_not_later_than,
-                                    place_id, width, height, is_low_quality, created_at, updated_at)
+                                    place_id, width, height, visibility, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO UPDATE SET
                     date_not_earlier_than = COALESCE(EXCLUDED.date_not_earlier_than, photos.date_not_earlier_than),
@@ -128,7 +128,7 @@ class Database:
                     updated_at = EXCLUDED.updated_at
                 """,
                 (photo_id, original_filename, date_not_earlier_than, date_not_later_than,
-                 place_id, width, height, False, now, now),
+                 place_id, width, height, "visible", now, now),
             )
         self._conn.commit()
 

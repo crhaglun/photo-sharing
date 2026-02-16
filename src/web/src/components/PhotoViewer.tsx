@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '@/services/api';
 import { AuthenticatedImage } from './AuthenticatedImage';
-import type { PhotoDetail, PlaceResponse, FaceInPhotoResponse } from '@/types/api';
+import type { PhotoDetail, PhotoVisibility, PlaceResponse, FaceInPhotoResponse } from '@/types/api';
 
 const FILMSTRIP_RADIUS = 3;
 
@@ -112,6 +112,12 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
     for (let i = start; i <= end; i++) indices.push(i);
     return indices;
   }, [index, photoIds.length]);
+
+  const handleVisibilityChange = useCallback(async (visibility: PhotoVisibility) => {
+    if (!detail || detail.visibility === visibility) return;
+    await api.updatePhoto(currentPhotoId, { visibility });
+    setDetail((prev) => prev ? { ...prev, visibility } : prev);
+  }, [detail, currentPhotoId]);
 
   const goTo = useCallback((i: number) => {
     setIndex(i);
@@ -231,6 +237,26 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
                   </span>
                 ))}</dd></>
               )}
+              <dt className="text-white/40">Visibility</dt>
+              <dd>
+                <div className="flex gap-1">
+                  {([['visible', 'Visible'], ['low_quality', 'Low quality'], ['deleted', 'Deleted']] as const)
+                    .filter(([value]) => value !== 'deleted' || detail.visibility === 'low_quality' || detail.visibility === 'deleted')
+                    .map(([value, label]) => (
+                    <button
+                      key={value}
+                      onClick={() => handleVisibilityChange(value)}
+                      className={`px-2 py-0.5 rounded text-xs cursor-pointer transition-colors ${
+                        detail.visibility === value
+                          ? 'bg-white/20 text-white'
+                          : 'text-white/40 hover:text-white/70'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </dd>
             </dl>
           ) : (
             <span className="text-white/40">Loading...</span>

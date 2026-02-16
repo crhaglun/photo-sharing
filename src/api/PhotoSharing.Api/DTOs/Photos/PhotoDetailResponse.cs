@@ -8,7 +8,7 @@ public class PhotoDetailResponse
     public DateTime? DateNotLaterThan { get; init; }
     public int? Width { get; init; }
     public int? Height { get; init; }
-    public bool IsLowQuality { get; init; }
+    public required string Visibility { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
     public PlaceResponse? Place { get; init; }

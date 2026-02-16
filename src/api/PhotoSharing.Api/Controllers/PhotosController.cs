@@ -41,11 +41,11 @@ public class PhotosController : ControllerBase
             .Include(p => p.Faces)
             .AsQueryable();
 
-        // Filter by quality
-        if (!request.IncludeLowQuality)
-        {
-            query = query.Where(p => !p.IsLowQuality);
-        }
+        // Filter by visibility (deleted photos are never shown in listings)
+        if (request.IncludeLowQuality)
+            query = query.Where(p => p.Visibility != Entities.PhotoVisibility.Deleted);
+        else
+            query = query.Where(p => p.Visibility == Entities.PhotoVisibility.Visible);
 
         // Filter by date range (intersection)
         if (request.DateStart.HasValue)
@@ -86,7 +86,7 @@ public class PhotosController : ControllerBase
                 DateNotEarlierThan = p.DateNotEarlierThan,
                 DateNotLaterThan = p.DateNotLaterThan,
                 PlaceName = p.Place != null ? p.Place.NameEn : null,
-                IsLowQuality = p.IsLowQuality,
+                Visibility = p.Visibility,
                 FaceCount = p.Faces.Count
             })
             .ToListAsync(cancellationToken);
@@ -125,7 +125,7 @@ public class PhotosController : ControllerBase
             DateNotLaterThan = photo.DateNotLaterThan,
             Width = photo.Width,
             Height = photo.Height,
-            IsLowQuality = photo.IsLowQuality,
+            Visibility = photo.Visibility,
             CreatedAt = photo.CreatedAt,
             UpdatedAt = photo.UpdatedAt,
             Place = photo.Place != null ? MapPlace(photo.Place) : null,
@@ -203,14 +203,19 @@ public class PhotosController : ControllerBase
             photo.PlaceId = request.PlaceId.Value;
         }
 
-        if (request.IsLowQuality.HasValue && request.IsLowQuality != photo.IsLowQuality)
+        if (request.Visibility != null && request.Visibility != photo.Visibility)
         {
+            if (!Entities.PhotoVisibility.All.Contains(request.Visibility))
+            {
+                return BadRequest($"Invalid visibility value. Must be one of: {string.Join(", ", Entities.PhotoVisibility.All)}");
+            }
+
             await _editHistoryService.RecordEditAsync(
-                id, "quality", "is_low_quality",
-                photo.IsLowQuality.ToString(),
-                request.IsLowQuality.Value.ToString(),
+                id, "visibility", "visibility",
+                photo.Visibility,
+                request.Visibility,
                 cancellationToken);
-            photo.IsLowQuality = request.IsLowQuality.Value;
+            photo.Visibility = request.Visibility;
         }
 
         photo.UpdatedAt = DateTime.UtcNow;

@@ -37,8 +37,8 @@ public class PhotoSharingDbContext : DbContext
                 .HasDatabaseName("idx_photos_date_range");
             entity.HasIndex(e => e.PlaceId)
                 .HasDatabaseName("idx_photos_place");
-            entity.HasIndex(e => e.IsLowQuality)
-                .HasDatabaseName("idx_photos_low_quality");
+            entity.HasIndex(e => e.Visibility)
+                .HasDatabaseName("idx_photos_visibility");
 
             entity.HasOne(e => e.Place)
                 .WithMany(p => p.Photos)

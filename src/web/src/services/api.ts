@@ -1,5 +1,5 @@
 import { getIdToken } from './firebase';
-import type { PagedResponse, PhotoSummary, PhotoListParams, PhotoDetail, PersonResponse, ApiError, FaceCluster, Place, DateRange } from '@/types/api';
+import type { PagedResponse, PhotoSummary, PhotoListParams, PhotoDetail, PhotoVisibility, PersonResponse, ApiError, FaceCluster, Place, DateRange } from '@/types/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5161';
 
@@ -29,6 +29,7 @@ class ApiClient {
       throw error;
     }
 
+    if (response.status === 204) return undefined as T;
     return response.json();
   }
 
@@ -50,6 +51,13 @@ class ApiClient {
 
   async getPhoto(id: string): Promise<PhotoDetail> {
     return this.request<PhotoDetail>(`/photos/${id}`);
+  }
+
+  async updatePhoto(id: string, updates: { visibility?: PhotoVisibility }): Promise<void> {
+    await this.request(`/photos/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
   }
 
   async getPersons(): Promise<PersonResponse[]> {

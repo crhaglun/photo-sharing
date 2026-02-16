@@ -3,6 +3,15 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PhotoSharing.Api.Entities;
 
+public static class PhotoVisibility
+{
+    public const string Visible = "visible";
+    public const string LowQuality = "low_quality";
+    public const string Deleted = "deleted";
+
+    public static readonly string[] All = [Visible, LowQuality, Deleted];
+}
+
 [Table("photos")]
 public class Photo
 {
@@ -31,8 +40,9 @@ public class Photo
     [Column("height")]
     public int? Height { get; set; }
 
-    [Column("is_low_quality")]
-    public bool IsLowQuality { get; set; }
+    [Column("visibility")]
+    [MaxLength(20)]
+    public string Visibility { get; set; } = PhotoVisibility.Visible;
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
