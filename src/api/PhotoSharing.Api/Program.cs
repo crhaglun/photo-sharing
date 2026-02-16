@@ -45,9 +45,7 @@ builder.Services.AddSingleton(dataSource);
 builder.Services.AddDbContext<PhotoSharingDbContext>((services, options) =>
 {
     var ds = services.GetRequiredService<NpgsqlDataSource>();
-    options.UseNpgsql(ds, npgsql => npgsql.UseVector())
-           .ReplaceService<Microsoft.EntityFrameworkCore.Storage.IExecutionStrategyFactory,
-                          TokenExpiryRetryStrategyFactory>();
+    options.UseNpgsql(ds, npgsql => npgsql.UseVector());
 });
 
 // Configure blob storage
@@ -77,16 +75,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
         options.Events = new JwtBearerEvents
         {
-            OnAuthenticationFailed = context =>
-            {
-                Console.WriteLine($"Auth failed: {context.Exception.Message}");
-                return Task.CompletedTask;
-            },
-            OnTokenValidated = context =>
-            {
-                Console.WriteLine($"Token validated for: {context.Principal?.Identity?.Name}");
-                return Task.CompletedTask;
-            }
         };
     });
 
