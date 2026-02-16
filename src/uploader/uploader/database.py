@@ -137,7 +137,7 @@ class Database:
         if not self._conn:
             raise RuntimeError("Not connected to database")
 
-        raw_json = json.dumps(exif.raw_exif).replace("\u0000", "") if exif.raw_exif else None
+        raw_json = json.dumps(exif.raw_exif).replace("\\u0000", "") if exif.raw_exif else None
 
         with self._conn.cursor() as cur:
             cur.execute(
