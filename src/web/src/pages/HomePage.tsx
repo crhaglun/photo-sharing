@@ -12,8 +12,13 @@ export const HomePage = () => {
   const [navTarget, setNavTarget] = useState<NavigationTarget | null>(null);
 
   const handleNavigate = useCallback((target: NavigationTarget) => {
-    setNavTarget(target);
-    setActiveTab(target.type === 'person' ? 'library' : 'faces');
+    if (target.type === 'library') {
+      setNavTarget(null);
+      setActiveTab('library');
+    } else {
+      setNavTarget(target);
+      setActiveTab(target.type === 'cluster' ? 'faces' : 'library');
+    }
   }, []);
 
   return (
@@ -68,8 +73,9 @@ export const HomePage = () => {
       <main className="py-6 px-2 sm:px-4">
         {activeTab === 'library' && (
           <LibraryView
-            key={navTarget?.type === 'person' ? navTarget.personId : 'default'}
+            key={navTarget?.type === 'person' ? navTarget.personId : navTarget?.type === 'similar' ? navTarget.photoId : 'default'}
             initialPersonId={navTarget?.type === 'person' ? navTarget.personId : undefined}
+            initialSimilarToId={navTarget?.type === 'similar' ? navTarget.photoId : undefined}
             onNavigate={handleNavigate}
           />
         )}

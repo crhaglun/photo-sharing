@@ -122,6 +122,13 @@ export interface DateRange {
   maxDate: string | null;
 }
 
+export interface SimilarPhotoResponse {
+  photoId: string;
+  distance: number;
+}
+
 export type NavigationTarget =
   | { type: 'person'; personId: string }
-  | { type: 'cluster'; clusterId: string };
+  | { type: 'cluster'; clusterId: string }
+  | { type: 'similar'; photoId: string }
+  | { type: 'library' };

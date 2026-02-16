@@ -309,11 +309,13 @@ public class PhotosController : ControllerBase
             return NotFound("No embedding found for this photo");
         }
 
-        // Use raw SQL for pgvector cosine distance query
+        // Use raw SQL for pgvector cosine distance query, excluding deleted photos
         var sql = @"
-            SELECT photo_id as ""PhotoId"", embedding <=> {0}::vector(768) AS ""Distance""
-            FROM image_embeddings
-            WHERE photo_id != {1}
+            SELECT ie.photo_id as ""PhotoId"", ie.embedding <=> {0}::vector(768) AS ""Distance""
+            FROM image_embeddings ie
+            JOIN photos p ON p.id = ie.photo_id
+            WHERE ie.photo_id != {1}
+              AND p.visibility != 'deleted'
             ORDER BY ""Distance""
             LIMIT {2}";
 

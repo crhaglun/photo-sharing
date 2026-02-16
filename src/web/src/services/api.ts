@@ -1,5 +1,5 @@
 import { getIdToken } from './firebase';
-import type { PagedResponse, PhotoSummary, PhotoListParams, PhotoDetail, PhotoVisibility, PersonResponse, ApiError, FaceCluster, Place, DateRange } from '@/types/api';
+import type { PagedResponse, PhotoSummary, PhotoListParams, PhotoDetail, PhotoVisibility, PersonResponse, ApiError, FaceCluster, Place, DateRange, SimilarPhotoResponse } from '@/types/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5161';
 
@@ -84,6 +84,10 @@ class ApiClient {
 
   async getPlaces(): Promise<Place[]> {
     return this.request<Place[]>('/places');
+  }
+
+  async getSimilarPhotos(id: string, limit = 200): Promise<SimilarPhotoResponse[]> {
+    return this.request<SimilarPhotoResponse[]>(`/photos/${id}/similar?limit=${limit}`);
   }
 
   async getDateRange(): Promise<DateRange> {
