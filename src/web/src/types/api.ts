@@ -127,8 +127,3 @@ export interface SimilarPhotoResponse {
   distance: number;
 }
 
-export type NavigationTarget =
-  | { type: 'person'; personId: string }
-  | { type: 'cluster'; clusterId: string }
-  | { type: 'similar'; photoId: string }
-  | { type: 'library' };

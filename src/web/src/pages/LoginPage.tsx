@@ -1,8 +1,12 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
 export const LoginPage = () => {
   const { user, loading, signInGoogle, signInMicrosoft, signInApple } = useAuth();
+  const location = useLocation();
+  const from = location.state?.from?.pathname
+    ? location.state.from.pathname + (location.state.from.search || '')
+    : '/';
 
   if (loading) {
     return (
@@ -13,7 +17,7 @@ export const LoginPage = () => {
   }
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={from} replace />;
   }
 
   return (

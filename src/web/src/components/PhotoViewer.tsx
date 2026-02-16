@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '@/services/api';
 import { getIdToken } from '@/services/firebase';
 import { AuthenticatedImage } from './AuthenticatedImage';
-import type { PhotoDetail, PhotoVisibility, PlaceResponse, NavigationTarget } from '@/types/api';
+import type { PhotoDetail, PhotoVisibility, PlaceResponse } from '@/types/api';
 
 const FILMSTRIP_THUMB_SIZE = 60;
 const FILMSTRIP_GAP = 4;
@@ -15,10 +15,13 @@ interface PhotoViewerProps {
   onClose: () => void;
   onIndexChange: (index: number) => void;
   onReachEnd?: () => void;
-  onNavigate?: (target: NavigationTarget) => void;
+  onPhotoChange?: (photoId: string) => void;
+  onNavigateToPerson?: (personId: string) => void;
+  onNavigateToSimilar?: (photoId: string) => void;
+  onNavigateToCluster?: (clusterId: string) => void;
 }
 
-export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, onReachEnd, onNavigate }: PhotoViewerProps) => {
+export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, onReachEnd, onPhotoChange, onNavigateToPerson, onNavigateToSimilar, onNavigateToCluster }: PhotoViewerProps) => {
   const [index, setIndex] = useState(currentIndex);
 
   useEffect(() => {
@@ -33,19 +36,21 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
       const newIndex = index + 1;
       setIndex(newIndex);
       onIndexChange(newIndex);
+      onPhotoChange?.(photoIds[newIndex]);
       if (newIndex >= photoIds.length - 3 && onReachEnd) {
         onReachEnd();
       }
     }
-  }, [index, canGoNext, photoIds.length, onIndexChange, onReachEnd]);
+  }, [index, canGoNext, photoIds, onIndexChange, onReachEnd, onPhotoChange]);
 
   const goPrev = useCallback(() => {
     if (canGoPrev) {
       const newIndex = index - 1;
       setIndex(newIndex);
       onIndexChange(newIndex);
+      onPhotoChange?.(photoIds[newIndex]);
     }
-  }, [index, canGoPrev, onIndexChange]);
+  }, [index, canGoPrev, photoIds, onIndexChange, onPhotoChange]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -172,18 +177,19 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
   const goTo = useCallback((i: number) => {
     setIndex(i);
     onIndexChange(i);
+    onPhotoChange?.(photoIds[i]);
     if (i >= photoIds.length - 3 && onReachEnd) {
       onReachEnd();
     }
-  }, [photoIds.length, onIndexChange, onReachEnd]);
+  }, [photoIds, onIndexChange, onReachEnd, onPhotoChange]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
       {/* Top-right controls */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
-        {onNavigate && (
+        {onNavigateToSimilar && (
           <button
-            onClick={() => onNavigate({ type: 'similar', photoId: currentPhotoId })}
+            onClick={() => onNavigateToSimilar(currentPhotoId)}
             className="text-white/70 hover:text-white p-2 cursor-pointer"
             aria-label="Show similar photos"
             title="Show similar photos"
@@ -296,7 +302,7 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
               )}
               {detail.faces.length > 0 && (
                 <><dt className="text-white/40">People</dt><dd>{detail.faces.map((f, i) => {
-                  const canNavigate = onNavigate && (f.personId || f.clusterId);
+                  const canNavigate = (onNavigateToPerson && f.personId) || (onNavigateToCluster && f.clusterId);
                   return (
                     <span key={f.id}>
                       {i > 0 && ', '}
@@ -305,8 +311,8 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
                         onMouseEnter={() => setHoveredFaceId(f.id)}
                         onMouseLeave={() => setHoveredFaceId(null)}
                         onClick={canNavigate ? () => {
-                          if (f.personId) onNavigate({ type: 'person', personId: f.personId });
-                          else if (f.clusterId) onNavigate({ type: 'cluster', clusterId: f.clusterId });
+                          if (f.personId && onNavigateToPerson) onNavigateToPerson(f.personId);
+                          else if (f.clusterId && onNavigateToCluster) onNavigateToCluster(f.clusterId);
                         } : undefined}
                       >
                         {f.personName || f.clusterId || '?'}

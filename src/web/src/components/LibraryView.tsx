@@ -1,47 +1,59 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { usePhotos } from '@/hooks/useApi';
 import { api } from '@/services/api';
 import { PlaceTreeSelector } from './PlaceTreeSelector';
 import { PhotoThumbnail } from './PhotoThumbnail';
 import { PhotoViewer } from './PhotoViewer';
 import { AuthenticatedImage } from './AuthenticatedImage';
-import type { PersonResponse, Place, PhotoListParams, DateRange, NavigationTarget, SimilarPhotoResponse } from '@/types/api';
+import type { PersonResponse, Place, DateRange, SimilarPhotoResponse } from '@/types/api';
 
-interface LibraryViewProps {
-  initialPersonId?: string;
-  initialSimilarToId?: string;
-  onNavigate?: (target: NavigationTarget) => void;
-}
-
-export const LibraryView = ({ initialPersonId, initialSimilarToId, onNavigate }: LibraryViewProps) => {
+export const LibraryView = () => {
   const { photos, loading, error, hasMore, totalCount, fetchPhotos, loadMore } = usePhotos();
   const loaderRef = useRef<HTMLDivElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
-  // Filter state
+  // Derive state from URL search params
+  const dateStart = searchParams.get('dateStart') || undefined;
+  const dateEnd = searchParams.get('dateEnd') || undefined;
+  const placeId = searchParams.get('placeId') || undefined;
+  const personId = searchParams.get('personId') || undefined;
+  const includeLowQuality = searchParams.get('lowQuality') === '1';
+  const similarToId = searchParams.get('similar') || undefined;
+  const activePhotoId = searchParams.get('photo') || undefined;
+
+  const filters = useMemo(() => {
+    const f: Record<string, string | boolean> = {};
+    if (dateStart) f.dateStart = dateStart;
+    if (dateEnd) f.dateEnd = dateEnd;
+    if (placeId) f.placeId = placeId;
+    if (personId) f.personId = personId;
+    if (includeLowQuality) f.includeLowQuality = true;
+    return f;
+  }, [dateStart, dateEnd, placeId, personId, includeLowQuality]);
+
+  // Filter option data
   const [persons, setPersons] = useState<PersonResponse[]>([]);
   const [places, setPlaces] = useState<Place[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
-  const [filters, setFilters] = useState<Omit<PhotoListParams, 'page' | 'pageSize'>>(
-    initialPersonId ? { personId: initialPersonId } : {}
-  );
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   // Similar mode state
   const [similarResults, setSimilarResults] = useState<SimilarPhotoResponse[] | null>(null);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarSourceName, setSimilarSourceName] = useState<string | null>(null);
   const [maxDistance, setMaxDistance] = useState(1.0);
-  const isSimilarMode = initialSimilarToId != null;
+  const isSimilarMode = similarToId != null;
 
-  // Fetch similar photos on mount when in similar mode
+  // Fetch similar photos when in similar mode
   useEffect(() => {
-    if (!initialSimilarToId) return;
+    if (!similarToId) return;
     let cancelled = false;
     setSimilarLoading(true);
 
     Promise.all([
-      api.getSimilarPhotos(initialSimilarToId),
-      api.getPhoto(initialSimilarToId),
+      api.getSimilarPhotos(similarToId),
+      api.getPhoto(similarToId),
     ]).then(([results, detail]) => {
       if (cancelled) return;
       setSimilarResults(results);
@@ -54,7 +66,7 @@ export const LibraryView = ({ initialPersonId, initialSimilarToId, onNavigate }:
     });
 
     return () => { cancelled = true; };
-  }, [initialSimilarToId]);
+  }, [similarToId]);
 
   // Filtered similar results based on distance slider
   const filteredSimilarIds = useMemo(() => {
@@ -115,26 +127,88 @@ export const LibraryView = ({ initialPersonId, initialSimilarToId, onNavigate }:
     return () => observer.disconnect();
   }, [handleObserver]);
 
-  const handleFilterChange = (key: keyof typeof filters, value: string | boolean | undefined) => {
-    setFilters((prev) => {
-      const next = { ...prev };
-      if (value !== undefined && value !== false) {
-        (next as Record<string, string | boolean>)[key] = value;
+  const handleFilterChange = (key: string, value: string | boolean | undefined) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (key === 'includeLowQuality') {
+        if (value) {
+          next.set('lowQuality', '1');
+        } else {
+          next.delete('lowQuality');
+        }
+      } else if (value !== undefined && value !== false && value !== '') {
+        next.set(key, String(value));
       } else {
-        delete (next as Record<string, string | boolean | undefined>)[key];
+        next.delete(key);
       }
+      // Remove photo param when filters change
+      next.delete('photo');
+      return next;
+    }, { replace: true });
+  };
+
+  const clearFilters = () => {
+    setSearchParams({}, { replace: true });
+  };
+
+  const hasActiveFilters = dateStart || dateEnd || placeId || personId || includeLowQuality;
+
+  // Which photo IDs to display
+  const displayPhotoIds = isSimilarMode ? filteredSimilarIds : photos.map((p) => p.id);
+
+  // Determine viewer index from photo param
+  const viewerIndex = useMemo(() => {
+    if (!activePhotoId) return null;
+    const idx = displayPhotoIds.indexOf(activePhotoId);
+    if (idx !== -1) return idx;
+    // Photo not in loaded results — show standalone
+    if (displayPhotoIds.length > 0) return null; // Results loaded but photo not found — don't force open
+    return 0; // Results still loading, we'll show standalone
+  }, [activePhotoId, displayPhotoIds]);
+
+  // Build the photo list for the viewer — if the target photo is not in results, show standalone
+  const viewerPhotoIds = useMemo(() => {
+    if (!activePhotoId) return displayPhotoIds;
+    if (displayPhotoIds.includes(activePhotoId)) return displayPhotoIds;
+    // Standalone mode: just the one photo
+    return [activePhotoId];
+  }, [activePhotoId, displayPhotoIds]);
+
+  const openViewer = (photoId: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('photo', photoId);
       return next;
     });
   };
 
-  const clearFilters = () => {
-    setFilters({});
+  const closeViewer = () => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('photo');
+      return next;
+    });
   };
 
-  const hasActiveFilters = Object.keys(filters).length > 0;
+  const handlePhotoChange = useCallback((photoId: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('photo', photoId);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
-  // Which photo IDs to display
-  const displayPhotoIds = isSimilarMode ? filteredSimilarIds : photos.map((p) => p.id);
+  const handleNavigateToPerson = useCallback((pid: string) => {
+    navigate(`/?personId=${encodeURIComponent(pid)}`);
+  }, [navigate]);
+
+  const handleNavigateToSimilar = useCallback((photoId: string) => {
+    navigate(`/?similar=${encodeURIComponent(photoId)}`);
+  }, [navigate]);
+
+  const handleNavigateToCluster = useCallback((clusterId: string) => {
+    navigate(`/faces?cluster=${encodeURIComponent(clusterId)}`);
+  }, [navigate]);
 
   return (
     <div>
@@ -145,7 +219,7 @@ export const LibraryView = ({ initialPersonId, initialSimilarToId, onNavigate }:
             {/* Source thumbnail */}
             <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
               <AuthenticatedImage
-                src={api.getThumbnailUrl(initialSimilarToId!)}
+                src={api.getThumbnailUrl(similarToId!)}
                 alt="Source photo"
                 className="w-full h-full object-cover"
               />
@@ -173,7 +247,7 @@ export const LibraryView = ({ initialPersonId, initialSimilarToId, onNavigate }:
 
             {/* Back to library */}
             <button
-              onClick={() => onNavigate?.({ type: 'library' })}
+              onClick={() => navigate('/')}
               className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
             >
               Back to library
@@ -198,7 +272,7 @@ export const LibraryView = ({ initialPersonId, initialSimilarToId, onNavigate }:
                 <label className="block text-xs text-gray-500 mb-1">From</label>
                 <input
                   type="date"
-                  value={filters.dateStart || ''}
+                  value={dateStart || ''}
                   min={dateRange?.minDate?.substring(0, 10) || undefined}
                   max={dateRange?.maxDate?.substring(0, 10) || undefined}
                   onChange={(e) => handleFilterChange('dateStart', e.target.value || undefined)}
@@ -209,7 +283,7 @@ export const LibraryView = ({ initialPersonId, initialSimilarToId, onNavigate }:
                 <label className="block text-xs text-gray-500 mb-1">To</label>
                 <input
                   type="date"
-                  value={filters.dateEnd || ''}
+                  value={dateEnd || ''}
                   min={dateRange?.minDate?.substring(0, 10) || undefined}
                   max={dateRange?.maxDate?.substring(0, 10) || undefined}
                   onChange={(e) => handleFilterChange('dateEnd', e.target.value || undefined)}
@@ -221,7 +295,7 @@ export const LibraryView = ({ initialPersonId, initialSimilarToId, onNavigate }:
             {/* Place filter */}
             <PlaceTreeSelector
               places={places}
-              selectedId={filters.placeId}
+              selectedId={placeId}
               onChange={(id) => handleFilterChange('placeId', id)}
             />
 
@@ -229,7 +303,7 @@ export const LibraryView = ({ initialPersonId, initialSimilarToId, onNavigate }:
             <div>
               <label className="block text-xs text-gray-500 mb-1">Person</label>
               <select
-                value={filters.personId || ''}
+                value={personId || ''}
                 onChange={(e) => handleFilterChange('personId', e.target.value || undefined)}
                 className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
               >
@@ -247,7 +321,7 @@ export const LibraryView = ({ initialPersonId, initialSimilarToId, onNavigate }:
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={filters.includeLowQuality || false}
+                  checked={includeLowQuality}
                   onChange={(e) => handleFilterChange('includeLowQuality', e.target.checked)}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
@@ -293,27 +367,30 @@ export const LibraryView = ({ initialPersonId, initialSimilarToId, onNavigate }:
                     key={id}
                     photoId={id}
                     alt={`Similar photo ${index + 1}`}
-                    onClick={() => setViewerIndex(index)}
+                    onClick={() => openViewer(id)}
                   />
                 )))
-          : photos.map((photo, index) => (
+          : photos.map((photo) => (
               <PhotoThumbnail
                 key={photo.id}
                 photoId={photo.id}
                 alt={photo.originalFilename}
-                onClick={() => setViewerIndex(index)}
+                onClick={() => openViewer(photo.id)}
               />
             ))}
       </div>
 
-      {viewerIndex !== null && (
+      {activePhotoId && viewerIndex !== null && (
         <PhotoViewer
-          photoIds={displayPhotoIds}
+          photoIds={viewerPhotoIds}
           currentIndex={viewerIndex}
-          onClose={() => setViewerIndex(null)}
-          onIndexChange={setViewerIndex}
+          onClose={closeViewer}
+          onIndexChange={(i) => handlePhotoChange(viewerPhotoIds[i])}
           onReachEnd={!isSimilarMode && hasMore ? loadMore : undefined}
-          onNavigate={onNavigate}
+          onPhotoChange={handlePhotoChange}
+          onNavigateToPerson={handleNavigateToPerson}
+          onNavigateToSimilar={handleNavigateToSimilar}
+          onNavigateToCluster={handleNavigateToCluster}
         />
       )}
 

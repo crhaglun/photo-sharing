@@ -1,25 +1,14 @@
-import { useCallback, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { LibraryView } from '@/components/LibraryView';
 import { FacesView } from '@/components/FacesView';
-import type { NavigationTarget } from '@/types/api';
-
-type Tab = 'library' | 'faces';
 
 export const HomePage = () => {
   const { user, signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>('library');
-  const [navTarget, setNavTarget] = useState<NavigationTarget | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const handleNavigate = useCallback((target: NavigationTarget) => {
-    if (target.type === 'library') {
-      setNavTarget(null);
-      setActiveTab('library');
-    } else {
-      setNavTarget(target);
-      setActiveTab(target.type === 'cluster' ? 'faces' : 'library');
-    }
-  }, []);
+  const activeTab = location.pathname === '/faces' ? 'faces' : 'library';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -46,7 +35,7 @@ export const HomePage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex gap-8">
             <button
-              onClick={() => { setNavTarget(null); setActiveTab('library'); }}
+              onClick={() => navigate('/')}
               className={`py-4 text-sm font-medium border-b-2 cursor-pointer ${
                 activeTab === 'library'
                   ? 'border-blue-500 text-blue-600'
@@ -56,7 +45,7 @@ export const HomePage = () => {
               Library
             </button>
             <button
-              onClick={() => { setNavTarget(null); setActiveTab('faces'); }}
+              onClick={() => navigate('/faces')}
               className={`py-4 text-sm font-medium border-b-2 cursor-pointer ${
                 activeTab === 'faces'
                   ? 'border-blue-500 text-blue-600'
@@ -71,21 +60,8 @@ export const HomePage = () => {
 
       {/* Main content */}
       <main className="py-6 px-2 sm:px-4">
-        {activeTab === 'library' && (
-          <LibraryView
-            key={navTarget?.type === 'person' ? navTarget.personId : navTarget?.type === 'similar' ? navTarget.photoId : 'default'}
-            initialPersonId={navTarget?.type === 'person' ? navTarget.personId : undefined}
-            initialSimilarToId={navTarget?.type === 'similar' ? navTarget.photoId : undefined}
-            onNavigate={handleNavigate}
-          />
-        )}
-        {activeTab === 'faces' && (
-          <FacesView
-            key={navTarget?.type === 'cluster' ? navTarget.clusterId : 'default'}
-            initialClusterId={navTarget?.type === 'cluster' ? navTarget.clusterId : undefined}
-            onNavigate={handleNavigate}
-          />
-        )}
+        {activeTab === 'library' && <LibraryView />}
+        {activeTab === 'faces' && <FacesView />}
       </main>
     </div>
   );

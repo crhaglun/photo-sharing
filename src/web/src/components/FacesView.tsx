@@ -1,23 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useFaceClusters } from '@/hooks/useApi';
 import { api } from '@/services/api';
 import { PhotoThumbnail } from './PhotoThumbnail';
 import { PhotoViewer } from './PhotoViewer';
-import type { PersonResponse, FaceCluster, NavigationTarget } from '@/types/api';
+import type { PersonResponse, FaceCluster } from '@/types/api';
 
 const PAGE_SIZE = 5;
 
-interface FacesViewProps {
-  initialClusterId?: string;
-  onNavigate?: (target: NavigationTarget) => void;
-}
-
-export const FacesView = ({ initialClusterId, onNavigate }: FacesViewProps) => {
+export const FacesView = () => {
   const { clusters, loading, error, fetchClusters } = useFaceClusters();
   const [persons, setPersons] = useState<PersonResponse[]>([]);
   const [assigning, setAssigning] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const clusterRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const initialClusterId = searchParams.get('cluster') || undefined;
 
   useEffect(() => {
     fetchClusters();
@@ -78,6 +78,18 @@ export const FacesView = ({ initialClusterId, onNavigate }: FacesViewProps) => {
     }
   };
 
+  const handleNavigateToPerson = (personId: string) => {
+    navigate(`/?personId=${encodeURIComponent(personId)}`);
+  };
+
+  const handleNavigateToSimilar = (photoId: string) => {
+    navigate(`/?similar=${encodeURIComponent(photoId)}`);
+  };
+
+  const handleNavigateToCluster = (clusterId: string) => {
+    navigate(`/faces?cluster=${encodeURIComponent(clusterId)}`);
+  };
+
   if (loading && clusters.length === 0) {
     return (
       <div className="text-center py-12">
@@ -120,7 +132,9 @@ export const FacesView = ({ initialClusterId, onNavigate }: FacesViewProps) => {
             persons={persons}
             isAssigning={assigning === cluster.clusterId}
             onAssign={(name) => handleAssign(cluster, name)}
-            onNavigate={onNavigate}
+            onNavigateToPerson={handleNavigateToPerson}
+            onNavigateToSimilar={handleNavigateToSimilar}
+            onNavigateToCluster={handleNavigateToCluster}
             highlight={cluster.clusterId === initialClusterId}
           />
         ))}
@@ -145,14 +159,16 @@ interface ClusterCardProps {
   persons: PersonResponse[];
   isAssigning: boolean;
   onAssign: (name: string) => void;
-  onNavigate?: (target: NavigationTarget) => void;
+  onNavigateToPerson?: (personId: string) => void;
+  onNavigateToSimilar?: (photoId: string) => void;
+  onNavigateToCluster?: (clusterId: string) => void;
   highlight?: boolean;
   ref?: React.Ref<HTMLDivElement>;
 }
 
 const FACES_PAGE_SIZE = 5;
 
-const ClusterCard = ({ cluster, persons, isAssigning, onAssign, onNavigate, highlight, ref }: ClusterCardProps) => {
+const ClusterCard = ({ cluster, persons, isAssigning, onAssign, onNavigateToPerson, onNavigateToSimilar, onNavigateToCluster, highlight, ref }: ClusterCardProps) => {
   const [name, setName] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -246,7 +262,9 @@ const ClusterCard = ({ cluster, persons, isAssigning, onAssign, onNavigate, high
           currentIndex={viewerIndex}
           onClose={() => setViewerIndex(null)}
           onIndexChange={setViewerIndex}
-          onNavigate={onNavigate}
+          onNavigateToPerson={onNavigateToPerson}
+          onNavigateToSimilar={onNavigateToSimilar}
+          onNavigateToCluster={onNavigateToCluster}
         />
       )}
     </div>
