@@ -3,7 +3,9 @@ import { api } from '@/services/api';
 import { AuthenticatedImage } from './AuthenticatedImage';
 import type { PhotoDetail, PhotoVisibility, PlaceResponse, FaceInPhotoResponse } from '@/types/api';
 
-const FILMSTRIP_RADIUS = 3;
+const FILMSTRIP_THUMB_SIZE = 60;
+const FILMSTRIP_GAP = 4;
+const FILMSTRIP_COUNTER_WIDTH = 80;
 let stickyShowInfo = false;
 
 interface PhotoViewerProps {
@@ -106,13 +108,35 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
     [detail]
   );
 
+  // Dynamic filmstrip sizing based on window width
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const { filmstripRadius, thumbSize } = useMemo(() => {
+    const available = windowWidth - FILMSTRIP_COUNTER_WIDTH - 16; // padding
+    // Try default 60px thumbs first, shrink if needed
+    let size = FILMSTRIP_THUMB_SIZE;
+    let radius = Math.max(0, Math.floor((available / (size + FILMSTRIP_GAP) - 1) / 2));
+    if (radius === 0 && available >= 40) {
+      // Try smaller thumbs to fit at least a few
+      size = 40;
+      radius = Math.max(0, Math.floor((available / (size + FILMSTRIP_GAP) - 1) / 2));
+    }
+    return { filmstripRadius: radius, thumbSize: size };
+  }, [windowWidth]);
+
   const filmstripIndices = useMemo(() => {
-    const start = Math.max(0, index - FILMSTRIP_RADIUS);
-    const end = Math.min(photoIds.length - 1, index + FILMSTRIP_RADIUS);
+    if (filmstripRadius === 0) return [];
+    const start = Math.max(0, index - filmstripRadius);
+    const end = Math.min(photoIds.length - 1, index + filmstripRadius);
     const indices: number[] = [];
     for (let i = start; i <= end; i++) indices.push(i);
     return indices;
-  }, [index, photoIds.length]);
+  }, [index, photoIds.length, filmstripRadius]);
 
   const handleVisibilityChange = useCallback(async (visibility: PhotoVisibility) => {
     if (!detail || detail.visibility === visibility) return;
@@ -274,9 +298,10 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
           <button
             key={photoIds[i]}
             onClick={() => goTo(i)}
-            className={`w-[60px] h-[60px] rounded overflow-hidden cursor-pointer flex-shrink-0 transition-opacity ${
+            className={`rounded overflow-hidden cursor-pointer flex-shrink-0 transition-opacity ${
               i === index ? 'ring-2 ring-white opacity-100' : 'opacity-50 hover:opacity-80'
             }`}
+            style={{ width: thumbSize, height: thumbSize }}
           >
             <AuthenticatedImage
               src={api.getThumbnailUrl(photoIds[i])}
