@@ -2,7 +2,8 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { usePhotos } from '@/hooks/useApi';
 import { api } from '@/services/api';
 import { PlaceTreeSelector } from './PlaceTreeSelector';
-import { AuthenticatedImage } from './AuthenticatedImage';
+import { PhotoThumbnail } from './PhotoThumbnail';
+import { PhotoViewer } from './PhotoViewer';
 import type { PersonResponse, Place, PhotoListParams, DateRange } from '@/types/api';
 
 export const LibraryView = () => {
@@ -14,6 +15,7 @@ export const LibraryView = () => {
   const [places, setPlaces] = useState<Place[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [filters, setFilters] = useState<Omit<PhotoListParams, 'page' | 'pageSize'>>({});
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   // Load filter options on mount
   useEffect(() => {
@@ -180,19 +182,25 @@ export const LibraryView = () => {
 
       {/* Photo grid */}
       <div className="flex flex-wrap gap-px justify-center">
-        {photos.map((photo) => (
-          <div
+        {photos.map((photo, index) => (
+          <PhotoThumbnail
             key={photo.id}
-            className="min-w-[100px] min-h-[100px] bg-gray-200 flex items-center justify-center"
-          >
-            <AuthenticatedImage
-              src={api.getThumbnailUrl(photo.id)}
-              alt={photo.originalFilename}
-              loading="lazy"
-            />
-          </div>
+            photoId={photo.id}
+            alt={photo.originalFilename}
+            onClick={() => setViewerIndex(index)}
+          />
         ))}
       </div>
+
+      {viewerIndex !== null && (
+        <PhotoViewer
+          photoIds={photos.map((p) => p.id)}
+          currentIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+          onIndexChange={setViewerIndex}
+          onReachEnd={hasMore ? loadMore : undefined}
+        />
+      )}
 
       {/* Loader / infinite scroll trigger */}
       <div ref={loaderRef} className="py-8 text-center">

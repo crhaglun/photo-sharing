@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useFaceClusters } from '@/hooks/useApi';
 import { api } from '@/services/api';
-import { AuthenticatedImage } from './AuthenticatedImage';
+import { PhotoThumbnail } from './PhotoThumbnail';
+import { PhotoViewer } from './PhotoViewer';
 import type { PersonResponse, FaceCluster } from '@/types/api';
 
 const PAGE_SIZE = 5;
@@ -128,9 +129,11 @@ const ClusterCard = ({ cluster, persons, isAssigning, onAssign }: ClusterCardPro
   const [name, setName] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const visibleFaces = expanded ? cluster.faces : cluster.faces.slice(0, FACES_PAGE_SIZE);
   const hiddenCount = cluster.faces.length - FACES_PAGE_SIZE;
+  const uniquePhotoIds = Array.from(new Set(cluster.faces.map((f) => f.photoId)));
 
   const filteredPersons = name.trim()
     ? persons.filter((p) =>
@@ -153,24 +156,19 @@ const ClusterCard = ({ cluster, persons, isAssigning, onAssign }: ClusterCardPro
 
   return (
     <div className="bg-white rounded-lg shadow p-4">
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap gap-px mb-4">
         {visibleFaces.map((face) => (
-          <div
+          <PhotoThumbnail
             key={face.id}
-            className="w-[80px] h-[80px] bg-gray-200 rounded overflow-hidden"
-          >
-            <AuthenticatedImage
-              src={api.getThumbnailUrl(face.photoId)}
-              alt={`Face ${face.id}`}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
-          </div>
+            photoId={face.photoId}
+            alt={`Face ${face.id}`}
+            onClick={() => setViewerIndex(uniquePhotoIds.indexOf(face.photoId))}
+          />
         ))}
         {hiddenCount > 0 && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="w-[80px] h-[80px] bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500 hover:bg-gray-200"
+            className="w-[100px] h-[100px] bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500 hover:bg-gray-200"
           >
             {expanded ? 'Show less' : `+${hiddenCount} more`}
           </button>
@@ -214,6 +212,15 @@ const ClusterCard = ({ cluster, persons, isAssigning, onAssign }: ClusterCardPro
           </button>
         </div>
       </form>
+
+      {viewerIndex !== null && (
+        <PhotoViewer
+          photoIds={uniquePhotoIds}
+          currentIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+          onIndexChange={setViewerIndex}
+        />
+      )}
     </div>
   );
 };
