@@ -405,3 +405,55 @@ class Database:
             cur.execute("SELECT COUNT(DISTINCT cluster_id) FROM faces WHERE cluster_id IS NOT NULL")
             row = cur.fetchone()
             return row[0] if row else 0
+
+    def get_all_photo_ids(self) -> set[str]:
+        """Get all existing photo IDs in the database.
+
+        Returns:
+            Set of photo IDs (SHA-256 hashes).
+        """
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT id FROM photos")
+            return {row[0] for row in cur.fetchall()}
+
+    def get_all_embedding_photo_ids(self) -> set[str]:
+        """Get all photo IDs that have embeddings.
+
+        Returns:
+            Set of photo IDs with existing embeddings.
+        """
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT photo_id FROM image_embeddings")
+            return {row[0] for row in cur.fetchall()}
+
+    def get_all_face_photo_ids(self) -> set[str]:
+        """Get all photo IDs that have at least one face detected.
+
+        Returns:
+            Set of photo IDs with existing face records.
+        """
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT photo_id FROM faces")
+            return {row[0] for row in cur.fetchall()}
+
+    def get_all_photo_places(self) -> dict[str, UUID]:
+        """Get all photo IDs with their assigned place_id.
+
+        Returns:
+            Dictionary mapping photo_id to place_id (only includes photos with non-null place_id).
+        """
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT id, place_id FROM photos WHERE place_id IS NOT NULL")
+            return {row[0]: row[1] for row in cur.fetchall()}

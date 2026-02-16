@@ -74,8 +74,40 @@ def resize_image(image: Image.Image, max_size: int, quality: int = 85) -> bytes:
 
 
 def create_thumbnail(image: Image.Image) -> bytes:
-    """Create 100px thumbnail. Prioritizes small file size."""
-    return resize_image(image, max_size=100, quality=60)
+    """Create 100px square thumbnail with center crop. Prioritizes small file size.
+
+    Args:
+        image: PIL Image to create thumbnail from.
+
+    Returns:
+        JPEG bytes of 100x100 square thumbnail.
+    """
+    size = 100
+    width, height = image.size
+
+    # Calculate scaling to make shortest side = size
+    scale = size / min(width, height)
+    new_width = int(width * scale)
+    new_height = int(height * scale)
+
+    # Scale image
+    scaled = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+    # Calculate center crop coordinates
+    left = (new_width - size) // 2
+    top = (new_height - size) // 2
+
+    # Crop to square
+    thumbnail = scaled.crop((left, top, left + size, top + size))
+
+    # Convert to RGB if necessary (for JPEG output)
+    if thumbnail.mode in ("RGBA", "P"):
+        thumbnail = thumbnail.convert("RGB")
+
+    # Save to bytes
+    buffer = io.BytesIO()
+    thumbnail.save(buffer, format="JPEG", quality=60, optimize=True)
+    return buffer.getvalue()
 
 
 def create_default_view(image: Image.Image) -> bytes:

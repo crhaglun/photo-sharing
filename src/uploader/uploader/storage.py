@@ -86,3 +86,18 @@ class BlobStorage:
         container_client = self.client.get_container_client(container)
         blob_client = container_client.get_blob_client(blob_name)
         return blob_client.exists()
+
+    def list_all_blobs(self, container: str) -> set[str]:
+        """List all blob names in a container.
+
+        Args:
+            container: Container name.
+
+        Returns:
+            Set of blob names.
+        """
+        container_client = self.client.get_container_client(container)
+        blob_names = set()
+        for blob in container_client.list_blobs():
+            blob_names.add(blob.name)
+        return blob_names
