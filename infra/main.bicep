@@ -1,5 +1,5 @@
-// Photo Sharing - Phase 1 Infrastructure
-// Deploys: VNet, PostgreSQL, Blob Storage (all private)
+// Photo Sharing - Infrastructure
+// Deploys: VNet, PostgreSQL, Blob Storage, ACR, Container Apps, Static Web App
 // VPN Gateway is deployed separately via vpn.bicep
 
 targetScope = 'subscription'
@@ -26,6 +26,10 @@ var vnetName = 'vnet-${baseName}'
 var postgresServerName = 'psql-${baseName}'
 var storageAccountName = replace('st${baseName}', '-', '')
 var storagePrivateEndpointName = 'pe-${baseName}-storage'
+var acrName = replace('acr${baseName}', '-', '')
+var containerAppEnvName = 'cae-${baseName}'
+var containerAppName = 'ca-${baseName}-api'
+var staticWebAppName = 'swa-${baseName}'
 
 // Resource Group
 resource rg 'Microsoft.Resources/resourceGroups@2023-07-01' = {
@@ -72,9 +76,48 @@ module storage 'modules/storage.bicep' = {
   }
 }
 
+// Deploy Container Registry
+module acr 'modules/acr.bicep' = {
+  scope: rg
+  name: 'acr'
+  params: {
+    location: location
+    acrName: acrName
+  }
+}
+
+// Deploy Container Apps (Environment + API app)
+module containerapp 'modules/containerapp.bicep' = {
+  scope: rg
+  name: 'containerapp'
+  params: {
+    location: location
+    containerAppEnvName: containerAppEnvName
+    containerAppName: containerAppName
+    subnetId: networking.outputs.containerAppSubnetId
+    acrLoginServer: acr.outputs.acrLoginServer
+    storageAccountId: storage.outputs.storageAccountId
+    storageAccountName: storage.outputs.storageAccountName
+    postgresServerName: postgres.outputs.serverName
+    firebaseProjectId: 'christoffers-photo-sharer'
+  }
+}
+
+// Deploy Static Web App
+module staticwebapp 'modules/staticwebapp.bicep' = {
+  scope: rg
+  name: 'staticwebapp'
+  params: {
+    name: staticWebAppName
+  }
+}
+
 // Outputs
 output resourceGroupName string = rg.name
 output vnetName string = networking.outputs.vnetName
 output postgresServerName string = postgres.outputs.serverName
 output postgresServerFqdn string = postgres.outputs.serverFqdn
 output storageAccountName string = storage.outputs.storageAccountName
+output acrLoginServer string = acr.outputs.acrLoginServer
+output containerAppFqdn string = containerapp.outputs.containerAppFqdn
+output swaDefaultHostname string = staticwebapp.outputs.swaDefaultHostname

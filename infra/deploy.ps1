@@ -60,16 +60,8 @@ $developerEmail = az ad signed-in-user show --query userPrincipalName -o tsv
 Write-Host "  Object ID: $developerObjectId" -ForegroundColor Green
 Write-Host "  Email: $developerEmail" -ForegroundColor Green
 
-# Prompt for PostgreSQL admin password
-Write-Host "`nPostgreSQL requires an admin password for initial setup." -ForegroundColor Yellow
-Write-Host "(Entra authentication will be used thereafter)" -ForegroundColor Gray
-$securePassword = Read-Host "Enter PostgreSQL admin password" -AsSecureString
-$postgresPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword))
-
-if ($postgresPassword.Length -lt 8) {
-    Write-Host "Password must be at least 8 characters" -ForegroundColor Red
-    exit 1
-}
+# PostgreSQL admin password (required by Azure API, but never used — Entra auth only)
+$postgresPassword = [Convert]::ToBase64String((1..24 | ForEach-Object { Get-Random -Maximum 256 }) -as [byte[]])
 
 # Confirm deployment
 Write-Host "`nDeployment Configuration:" -ForegroundColor Cyan
@@ -82,6 +74,9 @@ Write-Host "  - Resource Group: rg-$BaseName"
 Write-Host "  - Virtual Network"
 Write-Host "  - PostgreSQL Flexible Server (Burstable B1ms)"
 Write-Host "  - Storage Account with private endpoint"
+Write-Host "  - Container Registry"
+Write-Host "  - Container Apps Environment + API app"
+Write-Host "  - Static Web App"
 Write-Host ""
 
 $confirm = Read-Host "Proceed with deployment? (y/N)"

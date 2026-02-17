@@ -21,13 +21,10 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' existing = {
   name: vnetName
 }
 
-// GatewaySubnet (required by Azure VPN Gateway, must be named exactly 'GatewaySubnet')
-resource gatewaySubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
+// GatewaySubnet (created by networking.bicep, referenced here)
+resource gatewaySubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing = {
   parent: vnet
   name: gatewaySubnetName
-  properties: {
-    addressPrefix: '10.0.255.0/27'
-  }
 }
 
 // Public IP for VPN Gateway
