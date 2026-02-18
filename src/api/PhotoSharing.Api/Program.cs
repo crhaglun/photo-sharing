@@ -18,6 +18,7 @@ var connectionString = builder.Configuration.GetConnectionString("PhotoSharing")
 var connStringBuilder = new NpgsqlConnectionStringBuilder(connectionString)
 {
     MinPoolSize = 0, // Allow pool to fully drain when idle
+    MaxPoolSize = 20, // B1ms PostgreSQL has max_connections=50; leave room for uploader/admin
 };
 
 var dataSourceBuilder = new NpgsqlDataSourceBuilder(connStringBuilder.ConnectionString);
