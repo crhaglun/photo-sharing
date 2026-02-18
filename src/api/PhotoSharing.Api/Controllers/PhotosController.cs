@@ -104,6 +104,18 @@ public class PhotosController : ControllerBase
         };
     }
 
+    [HttpGet("heroes")]
+    public async Task<ActionResult<List<string>>> GetHeroPhotos(CancellationToken cancellationToken)
+    {
+        var heroIds = await _context.Photos
+            .Where(p => p.IsHero && p.Visibility == Entities.PhotoVisibility.Visible)
+            .OrderBy(p => p.DateNotEarlierThan ?? DateTime.MinValue)
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+
+        return heroIds;
+    }
+
     [HttpGet("{id}")]
     public async Task<ActionResult<PhotoDetailResponse>> GetPhoto(string id, CancellationToken cancellationToken)
     {
@@ -130,6 +142,7 @@ public class PhotosController : ControllerBase
             Width = photo.Width,
             Height = photo.Height,
             Visibility = photo.Visibility,
+            IsHero = photo.IsHero,
             CreatedAt = photo.CreatedAt,
             UpdatedAt = photo.UpdatedAt,
             Place = photo.Place != null ? MapPlace(photo.Place) : null,
@@ -222,6 +235,16 @@ public class PhotosController : ControllerBase
                 request.Visibility,
                 userId, cancellationToken);
             photo.Visibility = request.Visibility;
+        }
+
+        if (request.IsHero.HasValue && request.IsHero.Value != photo.IsHero)
+        {
+            await _editHistoryService.RecordEditAsync(
+                id, "hero", "is_hero",
+                photo.IsHero.ToString(),
+                request.IsHero.Value.ToString(),
+                userId, cancellationToken);
+            photo.IsHero = request.IsHero.Value;
         }
 
         photo.UpdatedAt = DateTime.UtcNow;

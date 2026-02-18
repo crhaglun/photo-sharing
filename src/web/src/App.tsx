@@ -36,6 +36,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/library"
+        element={
+          <ProtectedRoute>
+            <HomePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/faces"
         element={
           <ProtectedRoute>

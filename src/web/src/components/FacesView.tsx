@@ -79,11 +79,11 @@ export const FacesView = () => {
   };
 
   const handleNavigateToPerson = (personId: string) => {
-    navigate(`/?personId=${encodeURIComponent(personId)}`);
+    navigate(`/library?personId=${encodeURIComponent(personId)}`);
   };
 
   const handleNavigateToSimilar = (photoId: string) => {
-    navigate(`/?similar=${encodeURIComponent(photoId)}`);
+    navigate(`/library?similar=${encodeURIComponent(photoId)}`);
   };
 
   const handleNavigateToCluster = (clusterId: string) => {

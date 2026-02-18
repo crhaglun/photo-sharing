@@ -39,6 +39,9 @@ public class PhotoSharingDbContext : DbContext
                 .HasDatabaseName("idx_photos_place");
             entity.HasIndex(e => e.Visibility)
                 .HasDatabaseName("idx_photos_visibility");
+            entity.HasIndex(e => e.IsHero)
+                .HasFilter("is_hero = true")
+                .HasDatabaseName("idx_photos_hero");
 
             entity.HasOne(e => e.Place)
                 .WithMany(p => p.Photos)

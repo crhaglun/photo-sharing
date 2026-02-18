@@ -53,11 +53,15 @@ class ApiClient {
     return this.request<PhotoDetail>(`/photos/${id}`);
   }
 
-  async updatePhoto(id: string, updates: { visibility?: PhotoVisibility }): Promise<void> {
+  async updatePhoto(id: string, updates: { visibility?: PhotoVisibility; isHero?: boolean }): Promise<void> {
     await this.request(`/photos/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
     });
+  }
+
+  async getHeroPhotos(): Promise<string[]> {
+    return this.request<string[]>('/photos/heroes');
   }
 
   async getPersons(): Promise<PersonResponse[]> {

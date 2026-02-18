@@ -6,4 +6,5 @@ public class PhotoUpdateRequest
     public DateTime? DateNotLaterThan { get; set; }
     public Guid? PlaceId { get; set; }
     public string? Visibility { get; set; }
+    public bool? IsHero { get; set; }
 }

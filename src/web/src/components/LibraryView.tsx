@@ -199,11 +199,11 @@ export const LibraryView = () => {
   }, [setSearchParams]);
 
   const handleNavigateToPerson = useCallback((pid: string) => {
-    navigate(`/?personId=${encodeURIComponent(pid)}`);
+    navigate(`/library?personId=${encodeURIComponent(pid)}`);
   }, [navigate]);
 
   const handleNavigateToSimilar = useCallback((photoId: string) => {
-    navigate(`/?similar=${encodeURIComponent(photoId)}`);
+    navigate(`/library?similar=${encodeURIComponent(photoId)}`);
   }, [navigate]);
 
   const handleNavigateToCluster = useCallback((clusterId: string) => {
@@ -247,7 +247,7 @@ export const LibraryView = () => {
 
             {/* Back to library */}
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/library')}
               className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
             >
               Back to library

@@ -44,6 +44,9 @@ public class Photo
     [MaxLength(20)]
     public string Visibility { get; set; } = PhotoVisibility.Visible;
 
+    [Column("is_hero")]
+    public bool IsHero { get; set; } = false;
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
 

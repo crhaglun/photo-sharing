@@ -36,6 +36,7 @@ export interface PhotoDetail {
   width: number | null;
   height: number | null;
   visibility: PhotoVisibility;
+  isHero: boolean;
   createdAt: string;
   updatedAt: string;
   place: PlaceResponse | null;

@@ -174,6 +174,12 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
     setDetail((prev) => prev ? { ...prev, visibility } : prev);
   }, [detail, currentPhotoId]);
 
+  const handleHeroChange = useCallback(async (isHero: boolean) => {
+    if (!detail) return;
+    await api.updatePhoto(currentPhotoId, { isHero });
+    setDetail((prev) => prev ? { ...prev, isHero } : prev);
+  }, [detail, currentPhotoId]);
+
   const goTo = useCallback((i: number) => {
     setIndex(i);
     onIndexChange(i);
@@ -340,6 +346,18 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
                     </button>
                   ))}
                 </div>
+              </dd>
+              <dt className="text-white/40">Start page</dt>
+              <dd>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={detail.isHero}
+                    onChange={(e) => handleHeroChange(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-600 rounded focus:ring-blue-500 bg-transparent"
+                  />
+                  <span className="text-xs">Include on start page</span>
+                </label>
               </dd>
             </dl>
           ) : (
