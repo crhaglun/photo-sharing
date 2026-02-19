@@ -5,7 +5,7 @@ import { api } from '@/services/api';
 import { PlaceTreeSelector } from './PlaceTreeSelector';
 import { PhotoThumbnail } from './PhotoThumbnail';
 import { PhotoViewer } from './PhotoViewer';
-import { AuthenticatedImage } from './AuthenticatedImage';
+import { Thumbnail } from './Thumbnail';
 import type { PersonResponse, Place, DateRange, SimilarPhotoResponse } from '@/types/api';
 
 export const LibraryView = () => {
@@ -218,8 +218,8 @@ export const LibraryView = () => {
           <div className="flex flex-wrap gap-4 items-center">
             {/* Source thumbnail */}
             <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
-              <AuthenticatedImage
-                src={api.getThumbnailUrl(similarToId!)}
+              <Thumbnail
+                photoId={similarToId!}
                 alt="Source photo"
                 className="w-full h-full object-cover"
               />

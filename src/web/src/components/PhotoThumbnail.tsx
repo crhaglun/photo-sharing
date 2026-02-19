@@ -1,5 +1,4 @@
-import { api } from '@/services/api';
-import { AuthenticatedImage } from './AuthenticatedImage';
+import { Thumbnail } from './Thumbnail';
 
 interface PhotoThumbnailProps {
   photoId: string;
@@ -15,12 +14,7 @@ export const PhotoThumbnail = ({ photoId, alt, size = 100, onClick }: PhotoThumb
       className="bg-gray-200 rounded overflow-hidden cursor-pointer transition-transform hover:scale-105"
       onClick={onClick}
     >
-      <AuthenticatedImage
-        src={api.getThumbnailUrl(photoId)}
-        alt={alt}
-        className="w-full h-full object-cover"
-        loading="lazy"
-      />
+      <Thumbnail photoId={photoId} alt={alt} className="w-full h-full object-cover" />
     </div>
   );
 };

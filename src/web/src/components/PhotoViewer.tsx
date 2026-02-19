@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '@/services/api';
 import { getIdToken } from '@/services/firebase';
-import { AuthenticatedImage } from './AuthenticatedImage';
+import { DefaultImage } from './DefaultImage';
+import { Thumbnail } from './Thumbnail';
 import type { PhotoDetail, PhotoVisibility, PlaceResponse } from '@/types/api';
 
 const FILMSTRIP_THUMB_SIZE = 60;
@@ -267,9 +268,9 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
           </button>
         )}
 
-        <AuthenticatedImage
+        <DefaultImage
           key={currentPhotoId}
-          src={api.getDefaultUrl(currentPhotoId)}
+          photoId={currentPhotoId}
           alt={`Photo ${index + 1}`}
           className="max-h-full max-w-full object-contain"
         />
@@ -380,8 +381,8 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
             }`}
             style={{ width: thumbSize, height: thumbSize }}
           >
-            <AuthenticatedImage
-              src={api.getThumbnailUrl(photoIds[i])}
+            <Thumbnail
+              photoId={photoIds[i]}
               alt={`Thumbnail ${i + 1}`}
               className="w-full h-full object-cover"
             />

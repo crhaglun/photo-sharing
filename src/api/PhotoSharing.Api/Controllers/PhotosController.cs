@@ -253,6 +253,7 @@ public class PhotosController : ControllerBase
         return NoContent();
     }
 
+    [AllowAnonymous]
     [HttpGet("{id}/thumbnail")]
     public async Task<IActionResult> GetThumbnail(string id, CancellationToken cancellationToken)
     {

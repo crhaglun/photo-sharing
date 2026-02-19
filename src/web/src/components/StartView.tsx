@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/services/api';
-import { AuthenticatedImage } from './AuthenticatedImage';
+import { DefaultImage } from './DefaultImage';
 
 const CYCLE_INTERVAL_MS = 8000;
 
@@ -77,9 +77,9 @@ export const StartView = () => {
           transitioning ? 'opacity-0' : 'opacity-100'
         }`}
       >
-        <AuthenticatedImage
+        <DefaultImage
           key={currentId}
-          src={api.getDefaultUrl(currentId)}
+          photoId={currentId}
           alt={`Hero photo ${currentIndex + 1}`}
           className="max-h-full max-w-full object-contain"
         />
