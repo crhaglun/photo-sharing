@@ -60,6 +60,14 @@ class ApiClient {
     });
   }
 
+  async hidePhoto(id: string): Promise<void> {
+    await this.request(`/photos/${id}/hide`, { method: 'POST' });
+  }
+
+  async unhidePhoto(id: string): Promise<void> {
+    await this.request(`/photos/${id}/hide`, { method: 'DELETE' });
+  }
+
   async getHeroPhotos(): Promise<string[]> {
     return this.request<string[]>('/photos/heroes');
   }
@@ -83,6 +91,13 @@ class ApiClient {
     await this.request(`/faces/${faceId}`, {
       method: 'PATCH',
       body: JSON.stringify({ personId }),
+    });
+  }
+
+  async unassignFace(faceId: string): Promise<void> {
+    await this.request(`/faces/${faceId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ personId: null }),
     });
   }
 

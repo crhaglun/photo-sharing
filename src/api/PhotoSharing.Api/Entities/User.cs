@@ -22,4 +22,6 @@ public class User
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
+
+    public ICollection<HiddenPhoto> HiddenPhotos { get; set; } = new List<HiddenPhoto>();
 }

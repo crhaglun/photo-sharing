@@ -84,6 +84,16 @@ Some photos are near-duplicates or lower quality variants of similar shots. Thes
 - Flag can be set/unset in Fullscreen view
 - Changes tracked in edit history
 
+## Hide Photo (Show Only For Me)
+
+Users can hide individual photos from their own view without affecting other users.
+
+- Per-user hiding via `hidden_photos` table
+- Hidden photos are excluded from library, similar photos, and other listings for that user only
+- Other users continue to see the photo normally
+- Can be toggled in Fullscreen view
+- Changes tracked in edit history
+
 ## Keyboard Shortcuts (Fullscreen View)
 
 Navigation only:

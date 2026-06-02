@@ -84,12 +84,26 @@ cd src/api/PhotoSharing.Api && dotnet ef database update
 # Install uploader dependencies
 cd src/uploader && pip install -e .
 
-# Upload single photo (requires VPN)
+# Upload single photo with full pipeline (requires VPN)
 upload upload path/to/photo.jpg
 
-# Upload directory of photos
+# Upload directory with full pipeline (all stages at once)
 upload batch path/to/photos/
 
-# Run face clustering (after uploading photos)
+# --- Staged upload (run in order) ---
+# 1-3: Upload blobs (independent, can run in any order)
+upload originals path/to/photos/
+upload thumbnails path/to/photos/
+upload defaults path/to/photos/
+
+# 4: Create database records from EXIF metadata
+upload metadata path/to/photos/
+
+# 5-7: Enrichment (require metadata, can run in any order)
+upload places path/to/photos/
+upload detect-faces path/to/photos/
+upload generate-embeddings path/to/photos/
+
+# Run face clustering (after detect-faces)
 upload cluster --threshold 0.6 --min-samples 2
 ```

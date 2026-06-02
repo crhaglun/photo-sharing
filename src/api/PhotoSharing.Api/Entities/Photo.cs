@@ -7,9 +7,8 @@ public static class PhotoVisibility
 {
     public const string Visible = "visible";
     public const string LowQuality = "low_quality";
-    public const string Deleted = "deleted";
 
-    public static readonly string[] All = [Visible, LowQuality, Deleted];
+    public static readonly string[] All = [Visible, LowQuality];
 }
 
 [Table("photos")]
@@ -64,4 +63,6 @@ public class Photo
     public ExifMetadata? ExifMetadata { get; set; }
 
     public ICollection<EditHistory> EditHistory { get; set; } = new List<EditHistory>();
+
+    public ICollection<HiddenPhoto> HiddenPhotos { get; set; } = new List<HiddenPhoto>();
 }

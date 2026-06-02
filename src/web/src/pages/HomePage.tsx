@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { StartView } from '@/components/StartView';
 import { LibraryView } from '@/components/LibraryView';
 import { FacesView } from '@/components/FacesView';
+import { LegalView } from '@/components/LegalView';
 
 export const HomePage = () => {
   const { user, signOut } = useAuth();
@@ -13,7 +14,9 @@ export const HomePage = () => {
     ? 'faces'
     : location.pathname === '/library'
       ? 'library'
-      : 'start';
+      : location.pathname === '/legal'
+        ? 'legal'
+        : 'start';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -69,6 +72,16 @@ export const HomePage = () => {
             >
               Faces
             </button>
+            <button
+              onClick={() => navigate('/legal')}
+              className={`py-4 text-sm font-medium border-b-2 cursor-pointer ${
+                activeTab === 'legal'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Legal
+            </button>
           </nav>
         </div>
       </div>
@@ -78,6 +91,7 @@ export const HomePage = () => {
         {activeTab === 'start' && <StartView />}
         {activeTab === 'library' && <LibraryView />}
         {activeTab === 'faces' && <FacesView />}
+        {activeTab === 'legal' && <LegalView />}
       </main>
     </div>
   );

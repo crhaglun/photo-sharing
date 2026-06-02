@@ -18,7 +18,7 @@ var connectionString = builder.Configuration.GetConnectionString("PhotoSharing")
 var connStringBuilder = new NpgsqlConnectionStringBuilder(connectionString)
 {
     MinPoolSize = 0, // Allow pool to fully drain when idle
-    MaxPoolSize = 20, // B1ms PostgreSQL has max_connections=50; leave room for uploader/admin
+    MaxPoolSize = 15, // B1ms PostgreSQL has max_connections=50; leave room for uploader/admin
 };
 
 var dataSourceBuilder = new NpgsqlDataSourceBuilder(connStringBuilder.ConnectionString);
@@ -76,6 +76,26 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
         options.Events = new JwtBearerEvents
         {
+            OnTokenValidated = async context =>
+            {
+                var dbContext = context.HttpContext.RequestServices.GetRequiredService<PhotoSharingDbContext>();
+                var userId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (userId != null)
+                {
+                    var exists = await dbContext.Users.AnyAsync(u => u.FirebaseUid == userId);
+                    if (!exists)
+                    {
+                        dbContext.Users.Add(new PhotoSharing.Api.Entities.User
+                        {
+                            FirebaseUid = userId,
+                            Email = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? "",
+                            DisplayName = context.Principal?.FindFirst("name")?.Value,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                        await dbContext.SaveChangesAsync();
+                    }
+                }
+            }
         };
     });
 

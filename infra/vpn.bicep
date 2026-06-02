@@ -27,13 +27,14 @@ resource gatewaySubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' ex
   name: gatewaySubnetName
 }
 
-// Public IP for VPN Gateway
+// Public IP for VPN Gateway (zones required for AZ gateway SKUs)
 resource publicIp 'Microsoft.Network/publicIPAddresses@2023-05-01' = {
   name: vpnPublicIpName
   location: location
   sku: {
     name: 'Standard'
   }
+  zones: ['1', '2', '3']
   properties: {
     publicIPAllocationMethod: 'Static'
   }
@@ -47,8 +48,8 @@ resource vpnGateway 'Microsoft.Network/virtualNetworkGateways@2023-05-01' = {
     gatewayType: 'Vpn'
     vpnType: 'RouteBased'
     sku: {
-      name: 'VpnGw1'
-      tier: 'VpnGw1'
+      name: 'VpnGw1AZ'
+      tier: 'VpnGw1AZ'
     }
     ipConfigurations: [
       {

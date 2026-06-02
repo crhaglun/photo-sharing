@@ -624,6 +624,15 @@ def check(verbose: bool):
         db_places = db.get_all_photo_places()
         click.echo(" done.")
 
+        # Pre-compute discrepancy sets while DB is open
+        no_embedding = db_photos - db_embeddings
+        embedding_no_record = db_embeddings - db_photos
+        no_place = db_photos - set(db_places.keys())
+
+        # Pre-fetch filenames for discrepancies
+        filenames_lookup_ids = ((no_embedding | embedding_no_record | no_place) & db_photos)
+        db_filenames = db.get_photo_filenames(filenames_lookup_ids) if filenames_lookup_ids else {}
+
     click.echo()
     click.echo("=== Counts ===")
     click.echo(f"  Originals:  {len(originals_set)}")
@@ -637,7 +646,7 @@ def check(verbose: bool):
 
     issues = 0
 
-    def report(label: str, ids: set[str]) -> None:
+    def report(label: str, ids: set[str], filenames: dict[str, str] | None = None) -> None:
         nonlocal issues
         if not ids:
             return
@@ -645,7 +654,11 @@ def check(verbose: bool):
         click.echo(f"\n  {label}: {len(ids)}")
         if verbose:
             for pid in sorted(ids)[:20]:
-                click.echo(f"    {pid[:16]}...")
+                name = filenames.get(pid) if filenames else None
+                if name:
+                    click.echo(f"    {pid[:16]}... ({name})")
+                else:
+                    click.echo(f"    {pid[:16]}...")
             if len(ids) > 20:
                 click.echo(f"    ... and {len(ids) - 20} more")
 
@@ -665,8 +678,12 @@ def check(verbose: bool):
 
     click.echo()
     click.echo("=== Embeddings ===")
-    report("Has embedding but no DB record", db_embeddings - db_photos)
-    report("In DB but no embedding", db_photos - db_embeddings)
+    report("Has embedding but no DB record", embedding_no_record, db_filenames)
+    report("In DB but no embedding", no_embedding, db_filenames)
+
+    click.echo()
+    click.echo("=== Places ===")
+    report("In DB but no place", no_place, db_filenames)
 
     click.echo()
     if issues == 0:

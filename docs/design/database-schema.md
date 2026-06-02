@@ -58,14 +58,18 @@ Core entity representing a photo asset.
 | date_not_earlier_than | timestamp | NULL | Earliest possible date |
 | date_not_later_than | timestamp | NULL | Latest possible date |
 | place_id | uuid | FK → places.id, NULL | Location tag |
-| is_low_quality | boolean | NOT NULL DEFAULT false | Hide from default views |
+| visibility | varchar(20) | NOT NULL DEFAULT 'visible' | `visible` or `low_quality` |
+| width | int | NULL | Photo width in pixels |
+| height | int | NULL | Photo height in pixels |
+| is_hero | boolean | NOT NULL DEFAULT false | Featured on landing page |
 | created_at | timestamp | NOT NULL | When record was created |
 | updated_at | timestamp | NOT NULL | When record was last modified |
 
 **Indexes:**
 - `idx_photos_date_range` on (date_not_earlier_than, date_not_later_than) - date filtering
 - `idx_photos_place` on (place_id) - place filtering
-- `idx_photos_low_quality` on (is_low_quality) - quality filtering
+- `idx_photos_visibility` on (visibility) - visibility filtering
+- `idx_photos_hero` on (is_hero) WHERE is_hero = true - hero filtering
 
 ---
 
@@ -211,6 +215,26 @@ Allowlist of users who can access the service.
 
 ---
 
+### hidden_photos
+
+Per-user photo hiding. When a user hides a photo, it is only hidden for them.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| photo_id | char(64) | PK, FK → photos.id | Photo being hidden |
+| user_id | varchar(128) | PK, FK → users.firebase_uid | User who hid it |
+| hidden_at | timestamp | NOT NULL | When the photo was hidden |
+
+**Indexes:**
+- `idx_hidden_photos_user` on (user_id) - find all photos hidden by a user
+
+**Notes:**
+- Composite primary key (photo_id, user_id) — each user can hide each photo at most once
+- Replaces the former `deleted` visibility state which was global
+- Cascades on delete from both photos and users
+
+---
+
 ## Common Query Patterns
 
 ### Filter photos by date range (intersection)
@@ -218,7 +242,8 @@ Allowlist of users who can access the service.
 SELECT * FROM photos
 WHERE date_not_later_than >= :filter_start
   AND date_not_earlier_than <= :filter_end
-  AND is_low_quality = false;
+  AND visibility = 'visible'
+  AND id NOT IN (SELECT photo_id FROM hidden_photos WHERE user_id = :current_user);
 ```
 
 ### Filter photos by place (including descendants)
@@ -231,7 +256,8 @@ WITH RECURSIVE place_tree AS (
 )
 SELECT * FROM photos
 WHERE place_id IN (SELECT id FROM place_tree)
-  AND is_low_quality = false;
+  AND visibility = 'visible'
+  AND id NOT IN (SELECT photo_id FROM hidden_photos WHERE user_id = :current_user);
 ```
 
 ### Filter photos by person
@@ -239,7 +265,8 @@ WHERE place_id IN (SELECT id FROM place_tree)
 SELECT DISTINCT p.* FROM photos p
 JOIN faces f ON f.photo_id = p.id
 WHERE f.person_id = :person_id
-  AND p.is_low_quality = false;
+  AND p.visibility = 'visible'
+  AND p.id NOT IN (SELECT photo_id FROM hidden_photos WHERE user_id = :current_user);
 ```
 
 ### Find similar photos

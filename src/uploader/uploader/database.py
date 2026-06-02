@@ -449,6 +449,27 @@ class Database:
             cur.execute("SELECT DISTINCT photo_id FROM faces")
             return {row[0] for row in cur.fetchall()}
 
+    def get_photo_filenames(self, photo_ids: set[str]) -> dict[str, str]:
+        """Get original filenames for a set of photo IDs.
+
+        Args:
+            photo_ids: Set of photo IDs to look up.
+
+        Returns:
+            Dictionary mapping photo_id to original_filename.
+        """
+        if not self._conn:
+            raise RuntimeError("Not connected to database")
+        if not photo_ids:
+            return {}
+
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, original_filename FROM photos WHERE id = ANY(%s)",
+                (list(photo_ids),),
+            )
+            return {row[0]: row[1] for row in cur.fetchall()}
+
     def get_all_photo_places(self) -> dict[str, UUID]:
         """Get all photo IDs with their assigned place_id.
 

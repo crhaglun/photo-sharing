@@ -18,6 +18,7 @@ public class PhotoSharingDbContext : DbContext
     public DbSet<ExifMetadata> ExifMetadata => Set<ExifMetadata>();
     public DbSet<EditHistory> EditHistory => Set<EditHistory>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<HiddenPhoto> HiddenPhotos => Set<HiddenPhoto>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -151,6 +152,26 @@ public class PhotoSharingDbContext : DbContext
         {
             entity.HasKey(e => e.FirebaseUid);
             entity.HasIndex(e => e.Email).IsUnique();
+        });
+
+        // HiddenPhoto configuration
+        modelBuilder.Entity<HiddenPhoto>(entity =>
+        {
+            entity.HasKey(e => new { e.PhotoId, e.UserId });
+            entity.Property(e => e.PhotoId).HasColumnType("char(64)").IsFixedLength();
+
+            entity.HasIndex(e => e.UserId)
+                .HasDatabaseName("idx_hidden_photos_user");
+
+            entity.HasOne(e => e.Photo)
+                .WithMany(p => p.HiddenPhotos)
+                .HasForeignKey(e => e.PhotoId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.HiddenPhotos)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '@/services/api';
 import { getIdToken } from '@/services/firebase';
 import { DefaultImage } from './DefaultImage';
+import { FaceEditor } from './FaceEditor';
 import { Thumbnail } from './Thumbnail';
 import type { PhotoDetail, PhotoVisibility, PlaceResponse } from '@/types/api';
 
@@ -88,6 +89,10 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
     return () => { cancelled = true; };
   }, [showInfo, currentPhotoId]);
 
+  const refreshDetail = useCallback(() => {
+    api.getPhoto(currentPhotoId).then(setDetail).catch(() => {});
+  }, [currentPhotoId]);
+
   // Face bbox hover
   const [hoveredFaceId, setHoveredFaceId] = useState<string | null>(null);
   const imageAreaRef = useRef<HTMLDivElement>(null);
@@ -173,6 +178,16 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
     if (!detail || detail.visibility === visibility) return;
     await api.updatePhoto(currentPhotoId, { visibility });
     setDetail((prev) => prev ? { ...prev, visibility } : prev);
+  }, [detail, currentPhotoId]);
+
+  const handleHiddenChange = useCallback(async (hidden: boolean) => {
+    if (!detail) return;
+    if (hidden) {
+      await api.hidePhoto(currentPhotoId);
+    } else {
+      await api.unhidePhoto(currentPhotoId);
+    }
+    setDetail((prev) => prev ? { ...prev, isHiddenByMe: hidden } : prev);
   }, [detail, currentPhotoId]);
 
   const handleHeroChange = useCallback(async (isHero: boolean) => {
@@ -308,37 +323,28 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
                 <><dt className="text-white/40">Settings</dt><dd>{[detail.exif.focalLength, detail.exif.aperture, detail.exif.shutterSpeed, detail.exif.iso ? `ISO ${detail.exif.iso}` : null].filter(Boolean).join('  ')}</dd></>
               )}
               {detail.faces.length > 0 && (
-                <><dt className="text-white/40">People</dt><dd>{detail.faces.map((f, i) => {
-                  const canNavigate = (onNavigateToPerson && f.personId) || (onNavigateToCluster && f.clusterId);
-                  return (
-                    <span key={f.id}>
-                      {i > 0 && ', '}
-                      <span
-                        className={`hover:text-white transition-colors ${canNavigate ? 'cursor-pointer underline decoration-dotted underline-offset-2' : 'cursor-default'}`}
-                        onMouseEnter={() => setHoveredFaceId(f.id)}
-                        onMouseLeave={() => setHoveredFaceId(null)}
-                        onClick={canNavigate ? () => {
-                          if (f.personId && onNavigateToPerson) onNavigateToPerson(f.personId);
-                          else if (f.clusterId && onNavigateToCluster) onNavigateToCluster(f.clusterId);
-                        } : undefined}
-                      >
-                        {f.personName || f.clusterId || '?'}
-                      </span>
-                    </span>
-                  );
-                })}</dd></>
+                <><dt className="text-white/40">People</dt><dd>{detail.faces.map((f, i) => (
+                  <span key={f.id}>
+                    {i > 0 && ', '}
+                    <FaceEditor
+                      face={f}
+                      onHover={setHoveredFaceId}
+                      onUpdated={refreshDetail}
+                      onNavigateToPerson={onNavigateToPerson}
+                      onNavigateToCluster={onNavigateToCluster}
+                    />
+                  </span>
+                ))}</dd></>
               )}
               <dt className="text-white/40">Visibility</dt>
               <dd>
                 <div className="flex gap-1">
-                  {([['visible', 'Visible'], ['low_quality', 'Low quality'], ['deleted', 'Deleted']] as const)
-                    .filter(([value]) => value !== 'deleted' || detail.visibility === 'low_quality' || detail.visibility === 'deleted')
-                    .map(([value, label]) => (
+                  {([['visible', 'Show to everyone'], ['hidden', 'Show only to me']] as const).map(([value, label]) => (
                     <button
                       key={value}
-                      onClick={() => handleVisibilityChange(value)}
+                      onClick={() => handleHiddenChange(value === 'hidden')}
                       className={`px-2 py-0.5 rounded text-xs cursor-pointer transition-colors ${
-                        detail.visibility === value
+                        (value === 'hidden') === detail.isHiddenByMe
                           ? 'bg-white/20 text-white'
                           : 'text-white/40 hover:text-white/70'
                       }`}
@@ -347,6 +353,18 @@ export const PhotoViewer = ({ photoIds, currentIndex, onClose, onIndexChange, on
                     </button>
                   ))}
                 </div>
+              </dd>
+              <dt className="text-white/40">Quality</dt>
+              <dd>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={detail.visibility === 'low_quality'}
+                    onChange={(e) => handleVisibilityChange(e.target.checked ? 'low_quality' : 'visible')}
+                    className="w-4 h-4 text-blue-600 border-gray-600 rounded focus:ring-blue-500 bg-transparent"
+                  />
+                  <span className="text-xs">Low quality</span>
+                </label>
               </dd>
               <dt className="text-white/40">Start page</dt>
               <dd>

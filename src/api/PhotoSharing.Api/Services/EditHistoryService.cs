@@ -34,6 +34,5 @@ public class EditHistoryService : IEditHistoryService
         };
 
         _context.EditHistory.Add(entry);
-        await _context.SaveChangesAsync(cancellationToken);
     }
 }

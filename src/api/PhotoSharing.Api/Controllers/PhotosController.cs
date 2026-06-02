@@ -42,11 +42,15 @@ public class PhotosController : ControllerBase
             .Include(p => p.Faces)
             .AsQueryable();
 
-        // Filter by visibility (deleted photos are never shown in listings)
+        // Filter by visibility
+        var userId = User.GetUserId();
         if (request.IncludeLowQuality)
-            query = query.Where(p => p.Visibility != Entities.PhotoVisibility.Deleted);
+            query = query.Where(p => p.Visibility == Entities.PhotoVisibility.Visible || p.Visibility == Entities.PhotoVisibility.LowQuality);
         else
             query = query.Where(p => p.Visibility == Entities.PhotoVisibility.Visible);
+
+        // Exclude photos hidden by the current user
+        query = query.Where(p => !p.HiddenPhotos.Any(hp => hp.UserId == userId));
 
         // Filter by date range (intersection)
         // Ensure dates are UTC — query strings bind as Kind=Unspecified which Npgsql rejects for timestamptz
@@ -91,6 +95,7 @@ public class PhotosController : ControllerBase
                 DateNotLaterThan = p.DateNotLaterThan,
                 PlaceName = p.Place != null ? p.Place.NameEn : null,
                 Visibility = p.Visibility,
+                IsHiddenByMe = p.HiddenPhotos.Any(hp => hp.UserId == userId),
                 FaceCount = p.Faces.Count
             })
             .ToListAsync(cancellationToken);
@@ -126,12 +131,15 @@ public class PhotosController : ControllerBase
             .Include(p => p.Faces)
                 .ThenInclude(f => f.Person)
             .Include(p => p.EditHistory.OrderByDescending(e => e.ChangedAt))
+            .Include(p => p.HiddenPhotos)
             .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
         if (photo == null)
         {
             return NotFound();
         }
+
+        var currentUserId = User.GetUserId();
 
         return new PhotoDetailResponse
         {
@@ -142,6 +150,7 @@ public class PhotosController : ControllerBase
             Width = photo.Width,
             Height = photo.Height,
             Visibility = photo.Visibility,
+            IsHiddenByMe = photo.HiddenPhotos.Any(hp => hp.UserId == currentUserId),
             IsHero = photo.IsHero,
             CreatedAt = photo.CreatedAt,
             UpdatedAt = photo.UpdatedAt,
@@ -339,21 +348,81 @@ public class PhotosController : ControllerBase
             return NotFound("No embedding found for this photo");
         }
 
-        // Use raw SQL for pgvector cosine distance query, excluding deleted photos
+        // Use raw SQL for pgvector cosine distance query, excluding photos hidden by current user
+        var currentUserId = User.GetUserId();
         var sql = @"
             SELECT ie.photo_id as ""PhotoId"", ie.embedding <=> {0}::vector(768) AS ""Distance""
             FROM image_embeddings ie
             JOIN photos p ON p.id = ie.photo_id
             WHERE ie.photo_id != {1}
-              AND p.visibility != 'deleted'
+              AND NOT EXISTS (SELECT 1 FROM hidden_photos hp WHERE hp.photo_id = ie.photo_id AND hp.user_id = {3})
             ORDER BY ""Distance""
             LIMIT {2}";
 
         var similar = await _context.Database
-            .SqlQueryRaw<SimilarPhotoResponse>(sql, sourceEmbedding.ToArray(), id, limit)
+            .SqlQueryRaw<SimilarPhotoResponse>(sql, sourceEmbedding.ToArray(), id, limit, currentUserId)
             .ToListAsync(cancellationToken);
 
         return similar;
+    }
+
+    [HttpPost("{id}/hide")]
+    public async Task<IActionResult> HidePhoto(string id, CancellationToken cancellationToken)
+    {
+        var photo = await _context.Photos.FindAsync([id], cancellationToken);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        var userId = User.GetUserId();
+        var existing = await _context.HiddenPhotos
+            .FindAsync([id, userId], cancellationToken);
+
+        if (existing != null)
+        {
+            return NoContent(); // Already hidden
+        }
+
+        _context.HiddenPhotos.Add(new Entities.HiddenPhoto
+        {
+            PhotoId = id,
+            UserId = userId,
+            HiddenAt = DateTime.UtcNow
+        });
+
+        await _editHistoryService.RecordEditAsync(
+            id, "hidden", "hidden",
+            null, userId,
+            userId, cancellationToken);
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
+    [HttpDelete("{id}/hide")]
+    public async Task<IActionResult> UnhidePhoto(string id, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var existing = await _context.HiddenPhotos
+            .FindAsync([id, userId], cancellationToken);
+
+        if (existing == null)
+        {
+            return NotFound();
+        }
+
+        _context.HiddenPhotos.Remove(existing);
+
+        await _editHistoryService.RecordEditAsync(
+            id, "hidden", "hidden",
+            userId, null,
+            userId, cancellationToken);
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
     }
 
     private static PlaceResponse MapPlace(Entities.Place place)

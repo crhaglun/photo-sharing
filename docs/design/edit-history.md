@@ -11,6 +11,7 @@ Edit history applies to user-editable metadata:
 - Place tags (country, state, city, street)
 - Date/time tags (year, month, day, time)
 - Low-quality flag
+- Per-user photo hiding (show only for me)
 
 ## Design Principles
 

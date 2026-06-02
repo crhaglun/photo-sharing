@@ -6,7 +6,7 @@ export interface PagedResponse<T> {
   totalPages: number;
 }
 
-export type PhotoVisibility = 'visible' | 'low_quality' | 'deleted';
+export type PhotoVisibility = 'visible' | 'low_quality';
 
 export interface PhotoSummary {
   id: string;
@@ -15,6 +15,7 @@ export interface PhotoSummary {
   dateNotLaterThan: string | null;
   placeName: string | null;
   visibility: PhotoVisibility;
+  isHiddenByMe: boolean;
   faceCount: number;
 }
 
@@ -36,6 +37,7 @@ export interface PhotoDetail {
   width: number | null;
   height: number | null;
   visibility: PhotoVisibility;
+  isHiddenByMe: boolean;
   isHero: boolean;
   createdAt: string;
   updatedAt: string;

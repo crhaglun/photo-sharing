@@ -55,10 +55,12 @@ Write-Host "Image built: $fullImage" -ForegroundColor Green
 
 # Update Container App with new image
 Write-Host "`nUpdating Container App..." -ForegroundColor Yellow
+$revisionSuffix = "deploy-" + (Get-Date -Format "yyyyMMdd-HHmmss")
 az containerapp update `
     --name $ContainerAppName `
     --resource-group $ResourceGroup `
-    --image $fullImage
+    --image $fullImage `
+    --revision-suffix $revisionSuffix
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "`nContainer App update failed!" -ForegroundColor Red

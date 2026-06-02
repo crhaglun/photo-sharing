@@ -8,5 +8,6 @@ public class PhotoSummaryResponse
     public DateTime? DateNotLaterThan { get; init; }
     public string? PlaceName { get; init; }
     public required string Visibility { get; init; }
+    public bool IsHiddenByMe { get; init; }
     public int FaceCount { get; init; }
 }
